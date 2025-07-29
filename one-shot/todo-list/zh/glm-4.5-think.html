@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoList 看板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* 拖拽时的样式 */
+        .dragging {
+            opacity: 0.5;
+            cursor: move;
+        }
+        
+        .drag-over {
+            background-color: #f3f4f6;
+            border: 2px dashed #9ca3af;
+        }
+        
+        /* 任务卡片动画 */
+        .task-card {
+            transition: all 0.3s ease;
+        }
+        
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 优先级标签样式 */
+        .priority-high {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .priority-medium {
+            border-left: 4px solid #f59e0b;
+        }
+        
+        .priority-low {
+            border-left: 4px solid #10b981;
+        }
+        
+        /* 标签样式 */
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-right: 4px;
+        }
+        
+        /* 模态框背景 */
+        .modal-backdrop {
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- 头部导航 -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-tasks text-blue-600 text-2xl mr-3"></i>
+                    <h1 class="text-xl font-bold text-gray-800">TodoList 看板</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- 搜索框 -->
+                    <div class="relative">
+                        <input type="text" id="searchInput" placeholder="搜索任务..." 
+                               class="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                    </div>
+                    <!-- 添加任务按钮 -->
+                    <button onclick="openTaskModal()" 
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>新建任务
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容区域 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 筛选栏 -->
+        <div class="mb-6 flex flex-wrap items-center gap-4">
+            <div class="flex items-center space-x-2">
+                <label class="text-sm font-medium text-gray-700">优先级筛选：</label>
+                <select id="priorityFilter" onchange="filterTasks()" 
+                        class="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="all">全部</option>
+                    <option value="high">高</option>
+                    <option value="medium">中</option>
+                    <option value="low">低</option>
+                </select>
+            </div>
+            <div class="flex items-center space-x-2">
+                <label class="text-sm font-medium text-gray-700">标签筛选：</label>
+                <select id="tagFilter" onchange="filterTasks()" 
+                        class="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="all">全部</option>
+                </select>
+            </div>
+            <button onclick="clearCompleted()" 
+                    class="ml-auto text-sm text-red-600 hover:text-red-700 transition-colors">
+                <i class="fas fa-trash mr-1"></i>清除已完成
+            </button>
+        </div>
+
+        <!-- 看板容器 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- 待办列 -->
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-800">
+                        <i class="fas fa-circle text-gray-400 mr-2"></i>待办
+                        <span class="ml-2 text-sm text-gray-500" id="todoCount">(0)</span>
+                    </h2>
+                </div>
+                <div id="todoColumn" class="space-y-3 min-h-[400px]" ondrop="drop(event, 'todo')" ondragover="allowDrop(event)">
+                    <!-- 任务卡片将动态添加到这里 -->
+                </div>
+            </div>
+
+            <!-- 进行中列 -->
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-800">
+                        <i class="fas fa-circle text-blue-500 mr-2"></i>进行中
+                        <span class="ml-2 text-sm text-gray-500" id="inProgressCount">(0)</span>
+                    </h2>
+                </div>
+                <div id="inProgressColumn" class="space-y-3 min-h-[400px]" ondrop="drop(event, 'inProgress')" ondragover="allowDrop(event)">
+                    <!-- 任务卡片将动态添加到这里 -->
+                </div>
+            </div>
+
+            <!-- 已完成列 -->
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-800">
+                        <i class="fas fa-circle text-green-500 mr-2"></i>已完成
+                        <span class="ml-2 text-sm text-gray-500" id="completedCount">(0)</span>
+                    </h2>
+                </div>
+                <div id="completedColumn" class="space-y-3 min-h-[400px]" ondrop="drop(event, 'completed')" ondragover="allowDrop(event)">
+                    <!-- 任务卡片将动态添加到这里 -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 任务模态框 -->
+    <div id="taskModal" class="fixed inset-0 bg-black bg-opacity-50 hidden modal-backdrop z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                <h3 class="text-lg font-semibold mb-4" id="modalTitle">新建任务</h3>
+                <form id="taskForm" onsubmit="saveTask(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">任务标题</label>
+                        <input type="text" id="taskTitle" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">任务描述</label>
+                        <textarea id="taskDescription" rows="3" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">优先级</label>
+                        <select id="taskPriority" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="low">低</option>
+                            <option value="medium" selected>中</option>
+                            <option value="high">高</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">标签</label>
+                        <input type="text" id="taskTags" placeholder="输入标签，用逗号分隔" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">截止日期</label>
+                        <input type="date" id="taskDueDate" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeTaskModal()" 
+                                class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">
+                            取消
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let tasks = [];
+        let currentEditingTaskId = null;
+        let draggedElement = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTasks();
+            renderTasks();
+            updateTagFilter();
+        });
+
+        // 加载任务
+        function loadTasks() {
+            const savedTasks = localStorage.getItem('kanbanTasks');
+            if (savedTasks) {
+                tasks = JSON.parse(savedTasks);
+            }
+        }
+
+        // 保存任务
+        function saveTasks() {
+            localStorage.setItem('kanbanTasks', JSON.stringify(tasks));
+        }
+
+        // 渲染任务
+        function renderTasks() {
+            const todoColumn = document.getElementById('todoColumn');
+            const inProgressColumn = document.getElementById('inProgressColumn');
+            const completedColumn = document.getElementById('completedColumn');
+
+            // 清空列
+            todoColumn.innerHTML = '';
+            inProgressColumn.innerHTML = '';
+            completedColumn.innerHTML = '';
+
+            // 筛选任务
+            let filteredTasks = filterTasksBySearch();
+            filteredTasks = filterTasksByPriority(filteredTasks);
+            filteredTasks = filterTasksByTag(filteredTasks);
+
+            // 渲染任务卡片
+            filteredTasks.forEach(task => {
+                const taskCard = createTaskCard(task);
+                switch(task.status) {
+                    case 'todo':
+                        todoColumn.appendChild(taskCard);
+                        break;
+                    case 'inProgress':
+                        inProgressColumn.appendChild(taskCard);
+                        break;
+                    case 'completed':
+                        completedColumn.appendChild(taskCard);
+                        break;
+                }
+            });
+
+            // 更新计数
+            updateCounts();
+        }
+
+        // 创建任务卡片
+        function createTaskCard(task) {
+            const card = document.createElement('div');
+            card.className = `task-card bg-white border rounded-lg p-4 cursor-move priority-${task.priority}`;
+            card.draggable = true;
+            card.dataset.taskId = task.id;
+            card.ondragstart = drag;
+            card.ondragend = dragEnd;
+
+            const priorityColors = {
+                high: 'text-red-600 bg-red-100',
+                medium: 'text-yellow-600 bg-yellow-100',
+                low: 'text-green-600 bg-green-100'
+            };
+
+            const priorityLabels = {
+                high: '高',
+                medium: '中',
+                low: '低'
+            };
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="font-semibold text-gray-800 flex-1">${task.title}</h4>
+                    <div class="flex space-x-1 ml-2">
+                        <button onclick="editTask('${task.id}')" class="text-gray-400 hover:text-blue-600">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteTask('${task.id}')" class="text-gray-400 hover:text-red-600">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                ${task.description ? `<p class="text-sm text-gray-600 mb-3">${task.description}</p>` : ''}
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <span class="text-xs px-2 py-1 rounded ${priorityColors[task.priority]}">
+                        ${priorityLabels[task.priority]}优先级
+                    </span>
+                    ${task.tags.map(tag => `<span class="tag bg-blue-100 text-blue-700">${tag}</span>`).join('')}
+                </div>
+                ${task.dueDate ? `
+                    <div class="flex items-center text-sm text-gray-500">
+                        <i class="far fa-calendar mr-1"></i>
+                        ${new Date(task.dueDate).toLocaleDateString('zh-CN')}
+                    </div>
+                ` : ''}
+            `;
+
+            return card;
+        }
+
+        // 拖拽功能
+        function drag(e) {
+            draggedElement = e.target;
+            e.target.classList.add('dragging');
+        }
+
+        function dragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function allowDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function drop(e, status) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            
+            if (draggedElement) {
+                const taskId = draggedElement.dataset.taskId;
+                const task = tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.status = status;
+                    saveTasks();
+                    renderTasks();
+                }
+            }
+        }
+
+        // 打开任务模态框
+        function openTaskModal() {
+            currentEditingTaskId = null;
+            document.getElementById('modalTitle').textContent = '新建任务';
+            document.getElementById('taskForm').reset();
+            document.getElementById('taskModal').classList.remove('hidden');
+        }
+
+        // 关闭任务模态框
+        function closeTaskModal() {
+            document.getElementById('taskModal').classList.add('hidden');
+            currentEditingTaskId = null;
+        }
+
+        // 保存任务
+        function saveTask(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDescription').value;
+            const priority = document.getElementById('taskPriority').value;
+            const tags = document.getElementById('taskTags').value.split(',').map(tag => tag.trim()).filter(tag => tag);
+            const dueDate = document.getElementById('taskDueDate').value;
+
+            if (currentEditingTaskId) {
+                // 编辑现有任务
+                const task = tasks.find(t => t.id === currentEditingTaskId);
+                if (task) {
+                    task.title = title;
+                    task.description = description;
+                    task.priority = priority;
+                    task.tags = tags;
+                    task.dueDate = dueDate;
+                }
+            } else {
+                // 创建新任务
+                const newTask = {
+                    id: Date.now().toString(),
+                    title,
+                    description,
+                    priority,
+                    tags,
+                    dueDate,
+                    status: 'todo',
+                    createdAt: new Date().toISOString()
+                };
+                tasks.push(newTask);
+            }
+
+            saveTasks();
+            renderTasks();
+            updateTagFilter();
+            closeTaskModal();
+        }
+
+        // 编辑任务
+        function editTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                currentEditingTaskId = taskId;
+                document.getElementById('modalTitle').textContent = '编辑任务';
+                document.getElementById('taskTitle').value = task.title;
+                document.getElementById('taskDescription').value = task.description || '';
+                document.getElementById('taskPriority').value = task.priority;
+                document.getElementById('taskTags').value = task.tags.join(', ');
+                document.getElementById('taskDueDate').value = task.dueDate || '';
+                document.getElementById('taskModal').classList.remove('hidden');
+            }
+        }
+
+        // 删除任务
+        function deleteTask(taskId) {
+            if (confirm('确定要删除这个任务吗？')) {
+                tasks = tasks.filter(t => t.id !== taskId);
+                saveTasks();
+                renderTasks();
+                updateTagFilter();
+            }
+        }
+
+        // 清除已完成任务
+        function clearCompleted() {
+            if (confirm('确定要清除所有已完成的任务吗？')) {
+                tasks = tasks.filter(t => t.status !== 'completed');
+                saveTasks();
+                renderTasks();
+            }
+        }
+
+        // 搜索功能
+        function filterTasksBySearch() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            if (!searchTerm) return tasks;
+            
+            return tasks.filter(task => 
+                task.title.toLowerCase().includes(searchTerm) ||
+                (task.description && task.description.toLowerCase().includes(searchTerm)) ||
+                task.tags.some(tag => tag.toLowerCase().includes(searchTerm))
+            );
+        }
+
+        // 优先级筛选
+        function filterTasksByPriority(taskList = tasks) {
+            const priorityFilter = document.getElementById('priorityFilter').value;
+            if (priorityFilter === 'all') return taskList;
+            
+            return taskList.filter(task => task.priority === priorityFilter);
+        }
+
+        // 标签筛选
+        function filterTasksByTag(taskList = tasks) {
+            const tagFilter = document.getElementById('tagFilter').value;
+            if (tagFilter === 'all') return taskList;
+            
+            return taskList.filter(task => task.tags.includes(tagFilter));
+        }
+
+        // 综合筛选
+        function filterTasks() {
+            renderTasks();
+        }
+
+        // 更新标签筛选器
+        function updateTagFilter() {
+            const tagFilter = document.getElementById('tagFilter');
+            const currentSelected = tagFilter.value;
+            const allTags = new Set();
+            
+            tasks.forEach(task => {
+                task.tags.forEach(tag => allTags.add(tag));
+            });
+            
+            tagFilter.innerHTML = '<option value="all">全部</option>';
+            allTags.forEach(tag => {
+                const option = document.createElement('option');
+                option.value = tag;
+                option.textContent = tag;
+                tagFilter.appendChild(option);
+            });
+            
+            tagFilter.value = currentSelected;
+        }
+
+        // 更新计数
+        function updateCounts() {
+            const todoCount = tasks.filter(t => t.status === 'todo').length;
+            const inProgressCount = tasks.filter(t => t.status === 'inProgress').length;
+            const completedCount = tasks.filter(t => t.status === 'completed').length;
+            
+            document.getElementById('todoCount').textContent = `(${todoCount})`;
+            document.getElementById('inProgressCount').textContent = `(${inProgressCount})`;
+            document.getElementById('completedCount').textContent = `(${completedCount})`;
+        }
+
+        // 搜索输入事件
+        document.getElementById('searchInput').addEventListener('input', filterTasks);
+
+        // 点击模态框外部关闭
+        document.getElementById('taskModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeTaskModal();
+            }
+        });
+    </script>
+</body>
+</html>

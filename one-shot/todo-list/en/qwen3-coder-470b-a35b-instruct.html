@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive TODO List Board</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+            color: white;
+        }
+
+        header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .board {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+
+        .column {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            max-width: 350px;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .column-header {
+            padding: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .column-header h2 {
+            font-size: 1.5rem;
+            color: #333;
+        }
+
+        .task-count {
+            background: #e0e0e0;
+            border-radius: 20px;
+            padding: 3px 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .tasks {
+            padding: 15px;
+            flex-grow: 1;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        .task {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-left: 4px solid #4a69bd;
+        }
+
+        .task:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .task h3 {
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .task p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .task-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .priority {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .priority.high {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .priority.medium {
+            background: #ffd166;
+            color: #333;
+        }
+
+        .priority.low {
+            background: #06d6a0;
+            color: white;
+        }
+
+        .add-task {
+            padding: 20px;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        .add-task input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 10px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .add-task input:focus {
+            border-color: #4a69bd;
+        }
+
+        .add-task button {
+            width: 100%;
+            padding: 12px;
+            background: #4a69bd;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .add-task button:hover {
+            background: #3a59ad;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .controls button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .controls button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .add-column-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+        }
+
+        .add-column-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .clear-btn {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .clear-btn:hover {
+            background: #ff5252;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: center;
+            color: white;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .stats h2 {
+            margin-bottom: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .stat-card h3 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        footer {
+            color: white;
+            text-align: center;
+            padding: 30px 0;
+            margin-top: auto;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .board {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .column {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-tasks"></i> Interactive TODO Board</h1>
+            <p>Drag and drop tasks between columns, add new tasks, and manage your workflow</p>
+        </header>
+
+        <div class="board">
+            <div class="column" id="todo-column">
+                <div class="column-header">
+                    <h2>To Do</h2>
+                    <span class="task-count" id="todo-count">3</span>
+                </div>
+                <div class="tasks" id="todo-tasks">
+                    <div class="task" draggable="true">
+                        <h3>Design Homepage</h3>
+                        <p>Create wireframes and mockups for the new homepage layout</p>
+                        <div class="task-footer">
+                            <span class="priority high">High Priority</span>
+                            <span><i class="far fa-calendar"></i> Due: Today</span>
+                        </div>
+                    </div>
+                    <div class="task" draggable="true">
+                        <h3>Research Competitors</h3>
+                        <p>Analyze competitor websites and identify key features</p>
+                        <div class="task-footer">
+                            <span class="priority medium">Medium Priority</span>
+                            <span><i class="far fa-calendar"></i> Due: Tomorrow</span>
+                        </div>
+                    </div>
+                    <div class="task" draggable="true">
+                        <h3>Update Documentation</h3>
+                        <p>Review and update user documentation for new features</p>
+                        <div class="task-footer">
+                            <span class="priority low">Low Priority</span>
+                            <span><i class="far fa-calendar"></i> Due: Next Week</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="add-task">
+                    <input type="text" placeholder="Add a new task...">
+                    <button>Add Task</button>
+                </div>
+            </div>
+
+            <div class="column" id="inprogress-column">
+                <div class="column-header">
+                    <h2>In Progress</h2>
+                    <span class="task-count" id="inprogress-count">2</span>
+                </div>
+                <div class="tasks" id="inprogress-tasks">
+                    <div class="task" draggable="true">
+                        <h3>Implement API</h3>
+                        <p>Develop REST API endpoints for user management</p>
+                        <div class="task-footer">
+                            <span class="priority high">High Priority</span>
+                            <span><i class="far fa-calendar"></i> Due: Today</span>
+                        </div>
+                    </div>
+                    <div class="task" draggable="true">
+                        <h3>Fix Login Bug</h3>
+                        <p>Resolve issue with user authentication on mobile devices</p>
+                        <div class="task-footer">
+                            <span class="priority medium">Medium Priority</span>
+                            <span><i class="far fa-calendar"></i> Due: Tomorrow</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="add-task">
+                    <input type="text" placeholder="Add a new task...">
+                    <button>Add Task</button>
+                </div>
+            </div>
+
+            <div class="column" id="done-column">
+                <div class="column-header">
+                    <h2>Done</h2>
+                    <span class="task-count" id="done-count">2</span>
+                </div>
+                <div class="tasks" id="done-tasks">
+                    <div class="task" draggable="true">
+                        <h3>Setup Development Environment</h3>
+                        <p>Configure local development tools and dependencies</p>
+                        <div class="task-footer">
+                            <span class="priority low">Completed</span>
+                            <span><i class="far fa-calendar-check"></i> Completed: Yesterday</span>
+                        </div>
+                    </div>
+                    <div class="task" draggable="true">
+                        <h3>Team Meeting</h3>
+                        <p>Weekly sprint planning and progress review</p>
+                        <div class="task-footer">
+                            <span class="priority low">Completed</span>
+                            <span><i class="far fa-calendar-check"></i> Completed: 2 days ago</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="add-task">
+                    <input type="text" placeholder="Add a new task...">
+                    <button>Add Task</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="add-column-btn">
+                <i class="fas fa-plus"></i> Add Column
+            </button>
+            <button class="clear-btn">
+                <i class="fas fa-trash-alt"></i> Clear Completed
+            </button>
+        </div>
+
+        <div class="stats">
+            <h2>Productivity Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>7</h3>
+                    <p>Total Tasks</p>
+                </div>
+                <div class="stat-card">
+                    <h3>3</h3>
+                    <p>In Progress</p>
+                </div>
+                <div class="stat-card">
+                    <h3>2</h3>
+                    <p>Completed</p>
+                </div>
+                <div class="stat-card">
+                    <h3>85%</h3>
+                    <p>Productivity</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Interactive TODO List Board &copy; 2023 | Drag and drop to organize your tasks</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Task dragging functionality
+            const tasks = document.querySelectorAll('.task');
+            const columns = document.querySelectorAll('.tasks');
+            
+            let draggedTask = null;
+            
+            tasks.forEach(task => {
+                task.addEventListener('dragstart', function() {
+                    draggedTask = task;
+                    setTimeout(() => {
+                        task.style.opacity = '0.4';
+                    }, 0);
+                });
+                
+                task.addEventListener('dragend', function() {
+                    setTimeout(() => {
+                        task.style.opacity = '1';
+                        draggedTask = null;
+                    }, 0);
+                });
+            });
+            
+            columns.forEach(column => {
+                column.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                });
+                
+                column.addEventListener('dragenter', function(e) {
+                    e.preventDefault();
+                    this.style.backgroundColor = 'rgba(74, 105, 189, 0.1)';
+                });
+                
+                column.addEventListener('dragleave', function() {
+                    this.style.backgroundColor = '';
+                });
+                
+                column.addEventListener('drop', function() {
+                    this.style.backgroundColor = '';
+                    this.appendChild(draggedTask);
+                    updateTaskCounts();
+                });
+            });
+            
+            // Add task functionality
+            const addTaskButtons = document.querySelectorAll('.add-task button');
+            
+            addTaskButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const column = this.closest('.column');
+                    const input = column.querySelector('input');
+                    const taskText = input.value.trim();
+                    
+                    if (taskText) {
+                        const tasksContainer = column.querySelector('.tasks');
+                        const newTask = document.createElement('div');
+                        newTask.className = 'task';
+                        newTask.draggable = true;
+                        newTask.innerHTML = `
+                            <h3>${taskText}</h3>
+                            <p>Click to add description</p>
+                            <div class="task-footer">
+                                <span class="priority low">Low Priority</span>
+                                <span><i class="far fa-calendar"></i> Due: Soon</span>
+                            </div>
+                        `;
+                        
+                        tasksContainer.appendChild(newTask);
+                        input.value = '';
+                        
+                        // Add drag events to new task
+                        newTask.addEventListener('dragstart', function() {
+                            draggedTask = newTask;
+                            setTimeout(() => {
+                                newTask.style.opacity = '0.4';
+                            }, 0);
+                        });
+                        
+                        newTask.addEventListener('dragend', function() {
+                            setTimeout(() => {
+                                newTask.style.opacity = '1';
+                                draggedTask = null;
+                            }, 0);
+                        });
+                        
+                        updateTaskCounts();
+                    }
+                });
+            });
+            
+            // Add column functionality
+            const addColumnBtn = document.querySelector('.add-column-btn');
+            
+            addColumnBtn.addEventListener('click', function() {
+                const board = document.querySelector('.board');
+                const columns = document.querySelectorAll('.column');
+                const columnCount = columns.length;
+                
+                if (columnCount < 5) {
+                    const newColumn = document.createElement('div');
+                    newColumn.className = 'column';
+                    newColumn.innerHTML = `
+                        <div class="column-header">
+                            <h2>Column ${columnCount + 1}</h2>
+                            <span class="task-count">0</span>
+                        </div>
+                        <div class="tasks"></div>
+                        <div class="add-task">
+                            <input type="text" placeholder="Add a new task...">
+                            <button>Add Task</button>
+                        </div>
+                    `;
+                    
+                    board.appendChild(newColumn);
+                    
+                    // Add event listeners to new column
+                    const newTasksContainer = newColumn.querySelector('.tasks');
+                    const newAddButton = newColumn.querySelector('.add-task button');
+                    const newInput = newColumn.querySelector('input');
+                    
+                    newTasksContainer.addEventListener('dragover', function(e) {
+                        e.preventDefault();
+                    });
+                    
+                    newTasksContainer.addEventListener('dragenter', function(e) {
+                        e.preventDefault();
+                        this.style.backgroundColor = 'rgba(74, 105, 189, 0.1)';
+                    });
+                    
+                    newTasksContainer.addEventListener('dragleave', function() {
+                        this.style.backgroundColor = '';
+                    });
+                    
+                    newTasksContainer.addEventListener('drop', function() {
+                        this.style.backgroundColor = '';
+                        this.appendChild(draggedTask);
+                        updateTaskCounts();
+                    });
+                    
+                    newAddButton.addEventListener('click', function() {
+                        const taskText = newInput.value.trim();
+                        
+                        if (taskText) {
+                            const newTask = document.createElement('div');
+                            newTask.className = 'task';
+                            newTask.draggable = true;
+                            newTask.innerHTML = `
+                                <h3>${taskText}</h3>
+                                <p>Click to add description</p>
+                                <div class="task-footer">
+                                    <span class="priority low">Low Priority</span>
+                                    <span><i class="far fa-calendar"></i> Due: Soon</span>
+                                </div>
+                            `;
+                            
+                            newTasksContainer.appendChild(newTask);
+                            newInput.value = '';
+                            
+                            // Add drag events to new task
+                            newTask.addEventListener('dragstart', function() {
+                                draggedTask = newTask;
+                                setTimeout(() => {
+                                    newTask.style.opacity = '0.4';
+                                }, 0);
+                            });
+                            
+                            newTask.addEventListener('dragend', function() {
+                                setTimeout(() => {
+                                    newTask.style.opacity = '1';
+                                    draggedTask = null;
+                                }, 0);
+                            });
+                            
+                            updateTaskCounts();
+                        }
+                    });
+                } else {
+                    alert('Maximum of 5 columns allowed');
+                }
+            });
+            
+            // Clear completed tasks
+            const clearBtn = document.querySelector('.clear-btn');
+            
+            clearBtn.addEventListener('click', function() {
+                const doneTasks = document.querySelectorAll('#done-tasks .task');
+                doneTasks.forEach(task => task.remove());
+                updateTaskCounts();
+            });
+            
+            // Update task counts
+            function updateTaskCounts() {
+                const todoCount = document.querySelectorAll('#todo-tasks .task').length;
+                const inprogressCount = document.querySelectorAll('#inprogress-tasks .task').length;
+                const doneCount = document.querySelectorAll('#done-tasks .task').length;
+                
+                document.getElementById('todo-count').textContent = todoCount;
+                document.getElementById('inprogress-count').textContent = inprogressCount;
+                document.getElementById('done-count').textContent = doneCount;
+            }
+            
+            // Initialize task counts
+            updateTaskCounts();
+        });
+    </script>
+</body>
+</html>

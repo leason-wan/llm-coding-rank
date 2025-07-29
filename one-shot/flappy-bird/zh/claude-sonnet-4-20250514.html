@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB, #98FB98);
+            font-family: Arial, sans-serif;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background: linear-gradient(to bottom, #87CEEB, #98FB98);
+            border: 2px solid #333;
+            overflow: hidden;
+        }
+        
+        #bird {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #FFD700;
+            border-radius: 50%;
+            border: 2px solid #FFA500;
+            left: 50px;
+            transition: transform 0.1s;
+        }
+        
+        .pipe {
+            position: absolute;
+            width: 60px;
+            background: #228B22;
+            border: 2px solid #006400;
+        }
+        
+        .pipe-top {
+            top: 0;
+        }
+        
+        .pipe-bottom {
+            bottom: 0;
+        }
+        
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+        
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="bird"></div>
+        <div id="score">分数: 0</div>
+        
+        <div id="startScreen">
+            <h2>Flappy Bird</h2>
+            <p>点击空格键或鼠标让小鸟飞行</p>
+            <p>避开绿色管道！</p>
+            <button onclick="startGame()">开始游戏</button>
+        </div>
+        
+        <div id="gameOver">
+            <h2>游戏结束!</h2>
+            <p id="finalScore">最终分数: 0</p>
+            <button onclick="restartGame()">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        class FlappyBird {
+            constructor() {
+                this.gameContainer = document.getElementById('gameContainer');
+                this.bird = document.getElementById('bird');
+                this.scoreElement = document.getElementById('score');
+                this.gameOverScreen = document.getElementById('gameOver');
+                this.startScreen = document.getElementById('startScreen');
+                this.finalScoreElement = document.getElementById('finalScore');
+                
+                this.gameWidth = 400;
+                this.gameHeight = 600;
+                this.birdSize = 30;
+                this.pipeWidth = 60;
+                this.pipeGap = 150;
+                
+                this.reset();
+                this.setupEventListeners();
+            }
+            
+            reset() {
+                this.birdY = this.gameHeight / 2;
+                this.birdVelocity = 0;
+                this.gravity = 0.5;
+                this.jumpStrength = -10;
+                this.pipes = [];
+                this.score = 0;
+                this.gameRunning = false;
+                this.gameStarted = false;
+                
+                this.updateBirdPosition();
+                this.updateScore();
+                this.clearPipes();
+            }
+            
+            setupEventListeners() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        if (!this.gameStarted) {
+                            this.startGame();
+                        } else if (this.gameRunning) {
+                            this.jump();
+                        }
+                    }
+                });
+                
+                this.gameContainer.addEventListener('click', () => {
+                    if (!this.gameStarted) {
+                        this.startGame();
+                    } else if (this.gameRunning) {
+                        this.jump();
+                    }
+                });
+            }
+            
+            startGame() {
+                this.gameStarted = true;
+                this.gameRunning = true;
+                this.startScreen.style.display = 'none';
+                this.gameOverScreen.style.display = 'none';
+                this.gameLoop();
+                this.spawnPipes();
+            }
+            
+            jump() {
+                this.birdVelocity = this.jumpStrength;
+            }
+            
+            updateBird() {
+                this.birdVelocity += this.gravity;
+                this.birdY += this.birdVelocity;
+                
+                // 边界检查
+                if (this.birdY < 0) {
+                    this.birdY = 0;
+                    this.birdVelocity = 0;
+                }
+                
+                if (this.birdY > this.gameHeight - this.birdSize) {
+                    this.gameOver();
+                }
+                
+                this.updateBirdPosition();
+            }
+            
+            updateBirdPosition() {
+                this.bird.style.top = this.birdY + 'px';
+                // 添加旋转效果
+                const rotation = Math.min(Math.max(this.birdVelocity * 3, -30), 30);
+                this.bird.style.transform = `rotate(${rotation}deg)`;
+            }
+            
+            spawnPipes() {
+                if (!this.gameRunning) return;
+                
+                const pipeHeight = Math.random() * (this.gameHeight - this.pipeGap - 100) + 50;
+                
+                const topPipe = document.createElement('div');
+                topPipe.className = 'pipe pipe-top';
+                topPipe.style.height = pipeHeight + 'px';
+                topPipe.style.left = this.gameWidth + 'px';
+                
+                const bottomPipe = document.createElement('div');
+                bottomPipe.className = 'pipe pipe-bottom';
+                bottomPipe.style.height = (this.gameHeight - pipeHeight - this.pipeGap) + 'px';
+                bottomPipe.style.left = this.gameWidth + 'px';
+                
+                this.gameContainer.appendChild(topPipe);
+                this.gameContainer.appendChild(bottomPipe);
+                
+                this.pipes.push({
+                    top: topPipe,
+                    bottom: bottomPipe,
+                    x: this.gameWidth,
+                    scored: false
+                });
+                
+                setTimeout(() => this.spawnPipes(), 2000);
+            }
+            
+            updatePipes() {
+                for (let i = this.pipes.length - 1; i >= 0; i--) {
+                    const pipe = this.pipes[i];
+                    pipe.x -= 2;
+                    
+                    pipe.top.style.left = pipe.x + 'px';
+                    pipe.bottom.style.left = pipe.x + 'px';
+                    
+                    // 检查碰撞
+                    if (this.checkCollision(pipe)) {
+                        this.gameOver();
+                        return;
+                    }
+                    
+                    // 计分
+                    if (!pipe.scored && pipe.x + this.pipeWidth < 50) {
+                        pipe.scored = true;
+                        this.score++;
+                        this.updateScore();
+                    }
+                    
+                    // 移除屏幕外的管道
+                    if (pipe.x + this.pipeWidth < 0) {
+                        pipe.top.remove();
+                        pipe.bottom.remove();
+                        this.pipes.splice(i, 1);
+                    }
+                }
+            }
+            
+            checkCollision(pipe) {
+                const birdLeft = 50;
+                const birdRight = birdLeft + this.birdSize;
+                const birdTop = this.birdY;
+                const birdBottom = this.birdY + this.birdSize;
+                
+                const pipeLeft = pipe.x;
+                const pipeRight = pipe.x + this.pipeWidth;
+                
+                if (birdRight > pipeLeft && birdLeft < pipeRight) {
+                    const topPipeHeight = pipe.top.offsetHeight;
+                    const bottomPipeTop = this.gameHeight - pipe.bottom.offsetHeight;
+                    
+                    if (birdTop < topPipeHeight || birdBottom > bottomPipeTop) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            }
+            
+            updateScore() {
+                this.scoreElement.textContent = `分数: ${this.score}`;
+            }
+            
+            gameOver() {
+                this.gameRunning = false;
+                this.finalScoreElement.textContent = `最终分数: ${this.score}`;
+                this.gameOverScreen.style.display = 'block';
+            }
+            
+            clearPipes() {
+                this.pipes.forEach(pipe => {
+                    pipe.top.remove();
+                    pipe.bottom.remove();
+                });
+                this.pipes = [];
+            }
+            
+            gameLoop() {
+                if (!this.gameRunning) return;
+                
+                this.updateBird();
+                this.updatePipes();
+                
+                requestAnimationFrame(() => this.gameLoop());
+            }
+            
+            restart() {
+                this.reset();
+                this.startGame();
+            }
+        }
+        
+        // 创建游戏实例
+        const game = new FlappyBird();
+        
+        // 全局函数供按钮调用
+        function startGame() {
+            game.startGame();
+        }
+        
+        function restartGame() {
+            game.restart();
+        }
+    </script>
+</body>
+</html>

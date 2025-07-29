@@ -1,0 +1,1 @@
+Write a Flappy Bird game for me in a single HTML page. Keep the gravity weak so that the game is not too hard.

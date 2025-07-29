@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoList 看板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .add-task {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .add-task input {
+            width: 70%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .add-task button {
+            width: 25%;
+            padding: 10px;
+            margin-left: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .add-task button:hover {
+            background-color: #45a049;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .column {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            min-height: 400px;
+        }
+
+        .column h2 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .column.todo h2 {
+            border-bottom-color: #ff9800;
+        }
+
+        .column.doing h2 {
+            border-bottom-color: #2196F3;
+        }
+
+        .column.done h2 {
+            border-bottom-color: #4CAF50;
+        }
+
+        .task-list {
+            min-height: 300px;
+        }
+
+        .task {
+            background: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            cursor: move;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .task:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .task.dragging {
+            opacity: 0.5;
+        }
+
+        .task-content {
+            margin-bottom: 10px;
+            word-break: break-word;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .task-actions button {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .task-actions button:hover {
+            opacity: 0.8;
+        }
+
+        .btn-move {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .btn-delete {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .empty-message {
+            color: #999;
+            text-align: center;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .board {
+                grid-template-columns: 1fr;
+            }
+            
+            .add-task input {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            
+            .add-task button {
+                width: 100%;
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TodoList 看板</h1>
+        
+        <div class="add-task">
+            <input type="text" id="newTask" placeholder="添加新任务..." onkeypress="handleKeyPress(event)">
+            <button onclick="addTask()">添加任务</button>
+        </div>
+
+        <div class="board">
+            <div class="column todo">
+                <h2>待办事项</h2>
+                <div class="task-list" id="todoList" ondrop="drop(event)" ondragover="allowDrop(event)">
+                    <div class="empty-message">暂无待办任务</div>
+                </div>
+            </div>
+
+            <div class="column doing">
+                <h2>进行中</h2>
+                <div class="task-list" id="doingList" ondrop="drop(event)" ondragover="allowDrop(event)">
+                    <div class="empty-message">暂无进行中的任务</div>
+                </div>
+            </div>
+
+            <div class="column done">
+                <h2>已完成</h2>
+                <div class="task-list" id="doneList" ondrop="drop(event)" ondragover="allowDrop(event)">
+                    <div class="empty-message">暂无已完成的任务</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let taskId = 0;
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                addTask();
+            }
+        }
+
+        function addTask() {
+            const input = document.getElementById('newTask');
+            const taskText = input.value.trim();
+            
+            if (taskText === '') {
+                alert('请输入任务内容！');
+                return;
+            }
+
+            const task = {
+                id: taskId++,
+                content: taskText,
+                status: 'todo'
+            };
+
+            createTaskElement(task);
+            input.value = '';
+            updateEmptyMessages();
+            saveTasks();
+        }
+
+        function createTaskElement(task) {
+            const taskDiv = document.createElement('div');
+            taskDiv.className = 'task';
+            taskDiv.draggable = true;
+            taskDiv.dataset.taskId = task.id;
+            taskDiv.dataset.status = task.status;
+            
+            taskDiv.innerHTML = `
+                <div class="task-content">${task.content}</div>
+                <div class="task-actions">
+                    <button class="btn-move" onclick="moveTask(${task.id})">移动</button>
+                    <button class="btn-delete" onclick="deleteTask(${task.id})">删除</button>
+                </div>
+            `;
+
+            taskDiv.addEventListener('dragstart', dragStart);
+            taskDiv.addEventListener('dragend', dragEnd);
+
+            const targetList = document.getElementById(task.status + 'List');
+            targetList.appendChild(taskDiv);
+        }
+
+        function moveTask(taskId) {
+            const task = document.querySelector(`[data-task-id="${taskId}"]`);
+            const currentStatus = task.dataset.status;
+            let newStatus;
+
+            switch(currentStatus) {
+                case 'todo':
+                    newStatus = 'doing';
+                    break;
+                case 'doing':
+                    newStatus = 'done';
+                    break;
+                case 'done':
+                    newStatus = 'todo';
+                    break;
+            }
+
+            task.dataset.status = newStatus;
+            const newList = document.getElementById(newStatus + 'List');
+            newList.appendChild(task);
+            updateEmptyMessages();
+            saveTasks();
+        }
+
+        function deleteTask(taskId) {
+            if (confirm('确定要删除这个任务吗？')) {
+                const task = document.querySelector(`[data-task-id="${taskId}"]`);
+                task.remove();
+                updateEmptyMessages();
+                saveTasks();
+            }
+        }
+
+        function allowDrop(ev) {
+            ev.preventDefault();
+        }
+
+        function dragStart(ev) {
+            ev.dataTransfer.setData("taskId", ev.target.dataset.taskId);
+            ev.target.classList.add('dragging');
+        }
+
+        function dragEnd(ev) {
+            ev.target.classList.remove('dragging');
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const taskId = ev.dataTransfer.getData("taskId");
+            const task = document.querySelector(`[data-task-id="${taskId}"]`);
+            const newStatus = ev.target.closest('.task-list').id.replace('List', '');
+            
+            task.dataset.status = newStatus;
+            ev.target.closest('.task-list').appendChild(task);
+            updateEmptyMessages();
+            saveTasks();
+        }
+
+        function updateEmptyMessages() {
+            ['todo', 'doing', 'done'].forEach(status => {
+                const list = document.getElementById(status + 'List');
+                const emptyMessage = list.querySelector('.empty-message');
+                
+                if (list.children.length === 1 && emptyMessage) {
+                    emptyMessage.style.display = 'block';
+                } else if (list.children.length > 1 && emptyMessage) {
+                    emptyMessage.style.display = 'none';
+                }
+            });
+        }
+
+        function saveTasks() {
+            const tasks = [];
+            document.querySelectorAll('.task').forEach(task => {
+                tasks.push({
+                    id: task.dataset.taskId,
+                    content: task.querySelector('.task-content').textContent,
+                    status: task.dataset.status
+                });
+            });
+            localStorage.setItem('todoTasks', JSON.stringify(tasks));
+        }
+
+        function loadTasks() {
+            const savedTasks = localStorage.getItem('todoTasks');
+            if (savedTasks) {
+                const tasks = JSON.parse(savedTasks);
+                tasks.forEach(task => {
+                    createTaskElement(task);
+                    if (task.id >= taskId) {
+                        taskId = task.id + 1;
+                    }
+                });
+                updateEmptyMessages();
+            }
+        }
+
+        // 页面加载时恢复任务
+        window.onload = function() {
+            loadTasks();
+        };
+    </script>
+</body>
+</html>
