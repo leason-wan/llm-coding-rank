@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>待办事项看板</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        
+        .board {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+        
+        .column {
+            background-color: #ebecf0;
+            border-radius: 8px;
+            min-width: 300px;
+            max-width: 300px;
+            padding: 15px;
+        }
+        
+        .column-header {
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #172b4d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .task-count {
+            background-color: #dfe1e6;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 14px;
+        }
+        
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .task {
+            background-color: white;
+            border-radius: 6px;
+            padding: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .task:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 5px rgba(0,0,0,0.15);
+        }
+        
+        .task-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .task-desc {
+            font-size: 14px;
+            color: #5e6c84;
+        }
+        
+        .add-task {
+            margin-top: 15px;
+            background-color: transparent;
+            border: none;
+            color: #5e6c84;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            padding: 5px;
+        }
+        
+        .add-task:hover {
+            background-color: rgba(9, 30, 66, 0.08);
+            border-radius: 4px;
+        }
+        
+        .add-task:before {
+            content: "+";
+            margin-right: 5px;
+            font-size: 16px;
+        }
+        
+        .new-task-form {
+            display: none;
+            margin-top: 10px;
+        }
+        
+        .new-task-form input, .new-task-form textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .form-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .form-buttons button {
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .add-btn {
+            background-color: #0079bf;
+            color: white;
+            border: none;
+        }
+        
+        .cancel-btn {
+            background-color: transparent;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>待办事项看板</h1>
+        
+        <div class="board">
+            <div class="column">
+                <div class="column-header">
+                    <span>待处理</span>
+                    <span class="task-count">3</span>
+                </div>
+                <div class="task-list">
+                    <div class="task">
+                        <div class="task-title">完成项目提案</div>
+                        <div class="task-desc">准备下周会议的项目提案文档</div>
+                    </div>
+                    <div class="task">
+                        <div class="task-title">预约医生</div>
+                        <div class="task-desc">安排年度体检</div>
+                    </div>
+                    <div class="task">
+                        <div class="task-title">购买办公用品</div>
+                        <div class="task-desc">笔记本、笔和文件夹</div>
+                    </div>
+                </div>
+                <button class="add-task">添加任务</button>
+                <div class="new-task-form">
+                    <input type="text" placeholder="任务标题">
+                    <textarea placeholder="任务描述"></textarea>
+                    <div class="form-buttons">
+                        <button class="add-btn">添加</button>
+                        <button class="cancel-btn">取消</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="column-header">
+                    <span>进行中</span>
+                    <span class="task-count">2</span>
+                </div>
+                <div class="task-list">
+                    <div class="task">
+                        <div class="task-title">网站重新设计</div>
+                        <div class="task-desc">更新首页和产品页面的UI</div>
+                    </div>
+                    <div class="task">
+                        <div class="task-title">学习Vue.js</div>
+                        <div class="task-desc">完成在线课程的第3-5章</div>
+                    </div>
+                </div>
+                <button class="add-task">添加任务</button>
+                <div class="new-task-form">
+                    <input type="text" placeholder="任务标题">
+                    <textarea placeholder="任务描述"></textarea>
+                    <div class="form-buttons">
+                        <button class="add-btn">添加</button>
+                        <button class="cancel-btn">取消</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="column-header">
+                    <span>已完成</span>
+                    <span class="task-count">2</span>
+                </div>
+                <div class="task-list">
+                    <div class="task">
+                        <div class="task-title">更新简历</div>
+                        <div class="task-desc">添加最新项目经验</div>
+                    </div>
+                    <div class="task">
+                        <div class="task-title">缴纳水电费</div>
+                        <div class="task-desc">本月账单已支付</div>
+                    </div>
+                </div>
+                <button class="add-task">添加任务</button>
+                <div class="new-task-form">
+                    <input type="text" placeholder="任务标题">
+                    <textarea placeholder="任务描述"></textarea>
+                    <div class="form-buttons">
+                        <button class="add-btn">添加</button>
+                        <button class="cancel-btn">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取所有"添加任务"按钮
+        const addButtons = document.querySelectorAll('.add-task');
+        
+        // 为每个按钮添加点击事件
+        addButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // 隐藏按钮
+                this.style.display = 'none';
+                // 显示表单
+                const form = this.nextElementSibling;
+                form.style.display = 'block';
+            });
+        });
+        
+        // 获取所有"取消"按钮
+        const cancelButtons = document.querySelectorAll('.cancel-btn');
+        
+        // 为每个取消按钮添加点击事件
+        cancelButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // 隐藏表单
+                const form = this.closest('.new-task-form');
+                form.style.display = 'none';
+                // 显示"添加任务"按钮
+                const addButton = form.previousElementSibling;
+                addButton.style.display = 'flex';
+            });
+        });
+        
+        // 获取所有"添加"按钮
+        const submitButtons = document.querySelectorAll('.add-btn');
+        
+        // 为每个添加按钮添加点击事件
+        submitButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const form = this.closest('.new-task-form');
+                const titleInput = form.querySelector('input');
+                const descInput = form.querySelector('textarea');
+                
+                // 获取输入值
+                const title = titleInput.value.trim();
+                const desc = descInput.value.trim();
+                
+                // 验证输入
+                if (title) {
+                    // 创建新任务
+                    const taskList = form.closest('.column').querySelector('.task-list');
+                    const newTask = document.createElement('div');
+                    newTask.className = 'task';
+                    newTask.innerHTML = `
+                        <div class="task-title">${title}</div>
+                        <div class="task-desc">${desc}</div>
+                    `;
+                    
+                    // 添加到任务列表
+                    taskList.appendChild(newTask);
+                    
+                    // 更新任务计数
+                    const countElement = form.closest('.column').querySelector('.task-count');
+                    const currentCount = parseInt(countElement.textContent);
+                    countElement.textContent = currentCount + 1;
+                    
+                    // 重置表单
+                    titleInput.value = '';
+                    descInput.value = '';
+                    
+                    // 隐藏表单
+                    form.style.display = 'none';
+                    
+                    // 显示"添加任务"按钮
+                    const addButton = form.previousElementSibling;
+                    addButton.style.display = 'flex';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
