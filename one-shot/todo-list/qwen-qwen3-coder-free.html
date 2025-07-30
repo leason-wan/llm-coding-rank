@@ -1,0 +1,171 @@
+下面是一个简单的 **To-Do List 看板**（Kanban-style）界面的 HTML 示例，使用了基本的 HTML、CSS 和 JavaScript 来实现新增、拖拽和删除任务的功能。
+
+### ✅ 功能包括：
+- 添加任务到不同阶段（待办、进行中、已完成）
+- 通过拖拽将任务移动到不同阶段
+- 删除任务
+
+---
+
+## 📄 HTML 代码：`index.html`
+
+```html
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>TodoList 看板</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .kanban-board {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 20px;
+    }
+
+    .column {
+      background-color: #fff;
+      border-radius: 5px;
+      padding: 10px;
+      width: 30%;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .column h2 {
+      text-align: center;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+    }
+
+    .task {
+      background-color: #e0e0e0;
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: move;
+    }
+
+    .task input {
+      float: right;
+    }
+
+    .add-task {
+      margin-top: 10px;
+    }
+
+    .add-task input {
+      width: 70%;
+      padding: 5px;
+    }
+
+    .add-task button {
+      padding: 5px 10px;
+    }
+
+    .dragging {
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>TodoList 看板</h1>
+
+  <div class="kanban-board">
+    <div class="column" id="todo">
+      <h2>待办</h2>
+      <div class="task-list" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <!-- 动态任务项 -->
+      </div>
+      <div class="add-task">
+        <input type="text" id="new-todo" placeholder="输入新任务">
+        <button onclick="addTask('todo')">添加</button>
+      </div>
+    </div>
+
+    <div class="column" id="in-progress">
+      <h2>进行中</h2>
+      <div class="task-list" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <!-- 动态任务项 -->
+      </div>
+    </div>
+
+    <div class="column" id="done">
+      <h2>已完成</h2>
+      <div class="task-list" ondrop="drop(event)" ondragover="allowDrop(event)">
+        <!-- 动态任务项 -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let taskId = 0;
+
+    function addTask(columnId) {
+      const input = document.getElementById(columnId === 'todo' ? 'new-todo' : '');
+      if (!input || !input.value.trim()) return;
+
+      const taskText = input.value.trim();
+      const taskElement = document.createElement('div');
+      taskElement.className = 'task';
+      taskElement.draggable = true;
+      taskElement.id = `task-${taskId++}`;
+      taskElement.innerHTML = `
+        ${taskText}
+        <input type="button" value="删除" onclick="deleteTask('${taskElement.id}')">
+      `;
+
+      taskElement.ondragstart = drag;
+
+      document.querySelector(`#${columnId} .task-list`).appendChild(taskElement);
+      input.value = '';
+    }
+
+    function deleteTask(taskId) {
+      const task = document.getElementById(taskId);
+      if (task) task.remove();
+    }
+
+    function allowDrop(ev) {
+      ev.preventDefault();
+    }
+
+    function drag(ev) {
+      ev.dataTransfer.setData("text", ev.target.id);
+    }
+
+    function drop(ev) {
+      ev.preventDefault();
+      const data = ev.dataTransfer.getData("text");
+      const task = document.getElementById(data);
+      if (task) {
+        ev.target.closest('.task-list').appendChild(task);
+      }
+    }
+  </script>
+</body>
+</html>
+```
+
+---
+
+### 💡 说明：
+
+- 三个看板块（待办 / 进行中 / 已完成），每个板块有一个用于添加任务的输入框。
+- 每个任务可以拖拽到其他列中。
+- 点击“删除”可从页面上移除任务。
+- 使用 JavaScript 实现增删拖拽逻辑。
+- 无额外依赖（Vue、React 等），原生实现。
+
+---
+
+如果你希望用框架（如 Vue、React）或加入本地存储功能，也可以扩展。需要我帮你加这些功能吗？

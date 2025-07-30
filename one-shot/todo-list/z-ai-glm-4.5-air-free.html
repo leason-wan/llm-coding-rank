@@ -1,0 +1,551 @@
+
+我来为您创建一个功能完善的TodoList看板应用。这个看板将包含任务管理、拖拽排序、数据持久化等核心功能。
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoList 看板 - 高效任务管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .task-card {
+            animation: slideIn 0.3s ease-out;
+            transition: all 0.3s ease;
+        }
+        
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+        
+        .drag-over {
+            background-color: #f3f4f6;
+            border: 2px dashed #9ca3af;
+        }
+        
+        .priority-high { border-left: 4px solid #ef4444; }
+        .priority-medium { border-left: 4px solid #f59e0b; }
+        .priority-low { border-left: 4px solid #10b981; }
+        
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- 头部 -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-tasks text-blue-600 text-2xl"></i>
+                    <h1 class="text-2xl font-bold text-gray-900">TodoList 看板</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="addTaskBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors">
+                        <i class="fas fa-plus"></i>
+                        <span>添加任务</span>
+                    </button>
+                    <div class="flex items-center space-x-2 text-gray-600">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span id="currentDate"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 统计信息 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">总任务数</p>
+                        <p class="text-2xl font-bold text-gray-900" id="totalTasks">0</p>
+                    </div>
+                    <i class="fas fa-list-ul text-3xl text-blue-500"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">待办</p>
+                        <p class="text-2xl font-bold text-gray-900" id="todoCount">0</p>
+                    </div>
+                    <i class="fas fa-clock text-3xl text-yellow-500"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">进行中</p>
+                        <p class="text-2xl font-bold text-gray-900" id="inProgressCount">0</p>
+                    </div>
+                    <i class="fas fa-spinner text-3xl text-blue-500"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">已完成</p>
+                        <p class="text-2xl font-bold text-gray-900" id="completedCount">0</p>
+                    </div>
+                    <i class="fas fa-check-circle text-3xl text-green-500"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- 任务看板 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- 待办列 -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-semibold text-gray-900">待办</h2>
+                        <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full" id="todoBadge">0</span>
+                    </div>
+                </div>
+                <div class="p-4 min-h-[400px] custom-scrollbar" id="todoList" data-status="todo">
+                    <!-- 任务卡片将动态添加到这里 -->
+                </div>
+            </div>
+
+            <!-- 进行中列 -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-semibold text-gray-900">进行中</h2>
+                        <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full" id="inProgressBadge">0</span>
+                    </div>
+                </div>
+                <div class="p-4 min-h-[400px] custom-scrollbar" id="inProgressList" data-status="inProgress">
+                    <!-- 任务卡片将动态添加到这里 -->
+                </div>
+            </div>
+
+            <!-- 已完成列 -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-semibold text-gray-900">已完成</h2>
+                        <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full" id="completedBadge">0</span>
+                    </div>
+                </div>
+                <div class="p-4 min-h-[400px] custom-scrollbar" id="completedList" data-status="completed">
+                    <!-- 任务卡片将动态添加到这里 -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 添加/编辑任务模态框 -->
+    <div class="modal" id="taskModal">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full m-auto fade-in">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900" id="modalTitle">添加新任务</h3>
+            </div>
+            <form id="taskForm" class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">任务标题</label>
+                    <input type="text" id="taskTitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">任务描述</label>
+                    <textarea id="taskDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">优先级</label>
+                    <select id="taskPriority" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="low">低</option>
+                        <option value="medium" selected>中</option>
+                        <option value="high">高</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">截止日期</label>
+                    <input type="date" id="taskDeadline" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancelBtn" class="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 任务管理类
+        class TodoBoard {
+            constructor() {
+                this.tasks = this.loadTasks();
+                this.currentEditId = null;
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.renderTasks();
+                this.updateStats();
+                this.updateDate();
+                setInterval(() => this.updateDate(), 60000); // 每分钟更新日期
+            }
+
+            loadTasks() {
+                const saved = localStorage.getItem('todoTasks');
+                return saved ? JSON.parse(saved) : [];
+            }
+
+            saveTasks() {
+                localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+            }
+
+            setupEventListeners() {
+                // 添加任务按钮
+                document.getElementById('addTaskBtn').addEventListener('click', () => this.showModal());
+                
+                // 取消按钮
+                document.getElementById('cancelBtn').addEventListener('click', () => this.hideModal());
+                
+                // 表单提交
+                document.getElementById('taskForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.saveTask();
+                });
+                
+                // 模态框点击外部关闭
+                document.getElementById('taskModal').addEventListener('click', (e) => {
+                    if (e.target.classList.contains('modal')) {
+                        this.hideModal();
+                    }
+                });
+
+                // 设置拖拽事件
+                this.setupDragAndDrop();
+            }
+
+            setupDragAndDrop() {
+                const lists = document.querySelectorAll('[data-status]');
+                
+                lists.forEach(list => {
+                    list.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        list.classList.add('drag-over');
+                    });
+                    
+                    list.addEventListener('dragleave', () => {
+                        list.classList.remove('drag-over');
+                    });
+                    
+                    list.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        list.classList.remove('drag-over');
+                        const taskId = e.dataTransfer.getData('text/plain');
+                        const newStatus = list.dataset.status;
+                        this.updateTaskStatus(taskId, newStatus);
+                    });
+                });
+            }
+
+            showModal(taskId = null) {
+                this.currentEditId = taskId;
+                const modal = document.getElementById('taskModal');
+                const form = document.getElementById('taskForm');
+                
+                if (taskId) {
+                    const task = this.tasks.find(t => t.id === taskId);
+                    document.getElementById('modalTitle').textContent = '编辑任务';
+                    document.getElementById('taskTitle').value = task.title;
+                    document.getElementById('taskDescription').value = task.description || '';
+                    document.getElementById('taskPriority').value = task.priority;
+                    document.getElementById('taskDeadline').value = task.deadline || '';
+                } else {
+                    document.getElementById('modalTitle').textContent = '添加新任务';
+                    form.reset();
+                }
+                
+                modal.classList.add('active');
+            }
+
+            hideModal() {
+                document.getElementById('taskModal').classList.remove('active');
+                this.currentEditId = null;
+            }
+
+            saveTask() {
+                const title = document.getElementById('taskTitle').value.trim();
+                const description = document.getElementById('taskDescription').value.trim();
+                const priority = document.getElementById('taskPriority').value;
+                const deadline = document.getElementById('taskDeadline').value;
+                
+                if (!title) {
+                    document.getElementById('taskTitle').classList.add('shake');
+                    setTimeout(() => {
+                        document.getElementById('taskTitle').classList.remove('shake');
+                    }, 500);
+                    return;
+                }
+                
+                if (this.currentEditId) {
+                    // 编辑现有任务
+                    const taskIndex = this.tasks.findIndex(t => t.id === this.currentEditId);
+                    this.tasks[taskIndex] = {
+                        ...this.tasks[taskIndex],
+                        title,
+                        description,
+                        priority,
+                        deadline
+                    };
+                } else {
+                    // 创建新任务
+                    const task = {
+                        id: Date.now().toString(),
+                        title,
+                        description,
+                        priority,
+                        deadline,
+                        status: 'todo',
+                        createdAt: new Date().toISOString()
+                    };
+                    this.tasks.push(task);
+                }
+                
+                this.saveTasks();
+                this.renderTasks();
+                this.updateStats();
+                this.hideModal();
+            }
+
+            deleteTask(taskId) {
+                if (confirm('确定要删除这个任务吗？')) {
+                    this.tasks = this.tasks.filter(t => t.id !== taskId);
+                    this.saveTasks();
+                    this.renderTasks();
+                    this.updateStats();
+                }
+            }
+
+            updateTaskStatus(taskId, newStatus) {
+                const task = this.tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.status = newStatus;
+                    this.saveTasks();
+                    this.renderTasks();
+                    this.updateStats();
+                }
+            }
+
+            createTaskElement(task) {
+                const priorityColors = {
+                    high: 'priority-high',
+                    medium: 'priority-medium',
+                    low: 'priority-low'
+                };
+                
+                const priorityLabels = {
+                    high: '高',
+                    medium: '中',
+                    low: '低'
+                };
+                
+                const isOverdue = task.deadline && new Date(task.deadline) < new Date() && task.status !== 'completed';
+                
+                const taskEl = document.createElement('div');
+                taskEl.className = `task-card bg-white border rounded-lg p-4 mb-3 cursor-move ${priorityColors[task.priority]} ${task.status}`;
+                taskEl.draggable = true;
+                taskEl.dataset.taskId = task.id;
+                
+                taskEl.innerHTML = `
+                    <div class="flex items-start justify-between mb-2">
+                        <h3 class="font-medium text-gray-900 flex-1 mr-2">${task.title}</h3>
+                        <div class="flex space-x-1">
+                            <button onclick="todoBoard.showModal('${task.id}')" class="text-gray-400 hover:text-blue-600 transition-colors">
+                                <i class="fas fa-edit text-sm"></i>
+                            </button>
+                            <button onclick="todoBoard.deleteTask('${task.id}')" class="text-gray-400 hover:text-red-600 transition-colors">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                    ${task.description ? `<p class="text-gray-600 text-sm mb-2">${task.description}</p>` : ''}
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full ${task.priority === 'high' ? 'bg-red-100 text-red-800' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">
+                            ${priorityLabels[task.priority]}优先级
+                        </span>
+                        ${task.deadline ? `
+                            <span class="${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'} flex items-center">
+                                <i class="far fa-calendar mr-1"></i>
+                                ${new Date(task.deadline).toLocaleDateString('zh-CN')}
+                                ${isOverdue ? ' (已逾期)' : ''}
+                            </span>
+                        ` : ''}
+                    </div>
+                `;
+                
+                // 设置拖拽事件
+                taskEl.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', task.id);
+                    taskEl.classList.add('dragging');
+                });
+                
+                taskEl.addEventListener('dragend', () => {
+                    taskEl.classList.remove('dragging');
+                });
+                
+                return taskEl;
+            }
+
+            renderTasks() {
+                const todoList = document.getElementById('todoList');
+                const inProgressList = document.getElementById('inProgressList');
+                const completedList = document.getElementById('completedList');
+                
+                // 清空列表
+                todoList.innerHTML = '';
+                inProgressList.innerHTML = '';
+                completedList.innerHTML = '';
+                
+                // 添加任务到对应的列表
+                this.tasks.forEach(task => {
+                    const taskEl = this.createTaskElement(task);
+                    
+                    switch(task.status) {
+                        case 'todo':
+                            todoList.appendChild(taskEl);
+                            break;
+                        case 'inProgress':
+                            inProgressList.appendChild(taskEl);
+                            break;
+                        case 'completed':
+                            completedList.appendChild(taskEl);
+                            break;
+                    }
+                });
+            }
+
+            updateStats() {
+                const todoCount = this.tasks.filter(t => t.status === 'todo').length;
+                const inProgressCount = this.tasks.filter(t => t.status === 'inProgress').length;
+                const completedCount = this.tasks.filter(t => t.status === 'completed').length;
+                
+                document.getElementById('totalTasks').textContent = this.tasks.length;
+                document.getElementById('todoCount').textContent = todoCount;
+                document.getElementById('inProgressCount').textContent = inProgressCount;
+                document.getElementById('completedCount').textContent = completedCount;
+                
+                document.getElementById('todoBadge').textContent = todoCount;
+                document.getElementById('inProgressBadge').textContent = inProgressCount;
+                document.getElementById('completedBadge').textContent = completedCount;
+            }
+
+            updateDate() {
+                const now = new Date();
+                const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+                document.getElementById('currentDate').textContent = now.toLocaleDateString('zh-CN', options);
+            }
+        }
+
+        // 初始化应用
+        const todoBoard = new TodoBoard();
+    </script>
+</body>
+</html>
+```
+
+这个TodoList看板应用具有以下特点：
+
+## 核心功能
+1. **任务管理**：创建、编辑、删除任务
+2. **拖拽排序**：支持在三个状态栏之间拖拽任务
+3. **优先级设置**：高、中、低三个等级，用不同颜色标识
+4. **截止日期**：可设置任务截止时间，逾期任务会特别标记
+5. **数据持久化**：使用localStorage保存数据
+
+## 界面设计
+1. **响应式布局**：适配各种屏幕尺寸
+2. **统计面板**：实时显示各状态任务数量
+3. **动画效果**：卡片悬浮效果、拖拽动画、模态框淡入淡出
+4. **视觉反馈**：优先级颜色、逾期提醒、拖拽状态提示
+
+## 交互体验
+1. **表单验证**：确保标题不为空
+2. **确认对话框**：删除任务前确认
+3. **快捷操作**：快速编辑和删除按钮
+4. **当前日期显示**：自动更新日期
+
+## 技术特点
+- 使用原生JavaScript实现，无需额外框架
+- 面向对象编程，代码结构清晰
+- 使用Tailwind CSS实现现代化界面
+- 支持触摸设备的拖拽操作
+
+这个看板应用非常适合个人或小团队进行任务管理，界面简洁美观，功能实用完整。

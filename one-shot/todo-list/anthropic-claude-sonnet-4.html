@@ -1,0 +1,582 @@
+我来为你创建一个功能完整的 TodoList 看板。这个看板包含三个状态（待办、进行中、已完成）和拖拽功能：
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoList 看板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2d3748;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .add-task {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
+        .add-task input {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            width: 300px;
+            outline: none;
+        }
+
+        .add-task button {
+            padding: 10px 20px;
+            background: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .add-task button:hover {
+            background: #3182ce;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 30px;
+        }
+
+        .column {
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #e2e8f0;
+            min-height: 400px;
+        }
+
+        .column-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .column-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .task-count {
+            background: #4299e1;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .todo .task-count { background: #e53e3e; }
+        .in-progress .task-count { background: #dd6b20; }
+        .done .task-count { background: #38a169; }
+
+        .tasks {
+            min-height: 300px;
+            padding: 10px 0;
+        }
+
+        .task {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #4299e1;
+            cursor: move;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .task:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .task.dragging {
+            opacity: 0.7;
+            transform: rotate(5deg);
+        }
+
+        .task-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .task-text {
+            flex: 1;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #2d3748;
+            word-wrap: break-word;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 5px;
+            margin-left: 10px;
+        }
+
+        .task-actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #718096;
+            transition: all 0.2s;
+        }
+
+        .task-actions button:hover {
+            background: #edf2f7;
+            color: #2d3748;
+        }
+
+        .delete-btn:hover {
+            background: #fed7d7 !important;
+            color: #e53e3e !important;
+        }
+
+        .task-date {
+            font-size: 11px;
+            color: #718096;
+            margin-top: 8px;
+            display: block;
+        }
+
+        .column.drag-over {
+            background: #e6fffa;
+            border-color: #38a169;
+            transition: all 0.3s ease;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #a0aec0;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+
+        /* 状态颜色 */
+        .todo .task { border-left-color: #e53e3e; }
+        .in-progress .task { border-left-color: #dd6b20; }
+        .done .task { 
+            border-left-color: #38a169; 
+            opacity: 0.8;
+        }
+        .done .task-text {
+            text-decoration: line-through;
+            color: #718096;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .board {
+                grid-template-columns: 1fr;
+                padding: 15px;
+            }
+            
+            .add-task {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .add-task input {
+                width: 250px;
+            }
+        }
+
+        /* 美化滚动条 */
+        .tasks::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .tasks::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .tasks::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+
+        .tasks::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 TodoList 看板</h1>
+            <div class="add-task">
+                <input type="text" id="taskInput" placeholder="输入新任务..." maxlength="100">
+                <button onclick="addTask()">➕ 添加任务</button>
+            </div>
+        </div>
+
+        <div class="board">
+            <!-- 待办列 -->
+            <div class="column todo" id="todo">
+                <div class="column-header">
+                    <span class="column-title">📝 待办</span>
+                    <span class="task-count" id="todo-count">0</span>
+                </div>
+                <div class="tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
+                    <div class="empty-state">暂无待办任务</div>
+                </div>
+            </div>
+
+            <!-- 进行中列 -->
+            <div class="column in-progress" id="in-progress">
+                <div class="column-header">
+                    <span class="column-title">⚡ 进行中</span>
+                    <span class="task-count" id="in-progress-count">0</span>
+                </div>
+                <div class="tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
+                    <div class="empty-state">暂无进行中任务</div>
+                </div>
+            </div>
+
+            <!-- 已完成列 -->
+            <div class="column done" id="done">
+                <div class="column-header">
+                    <span class="column-title">✅ 已完成</span>
+                    <span class="task-count" id="done-count">0</span>
+                </div>
+                <div class="tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
+                    <div class="empty-state">暂无已完成任务</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let taskIdCounter = 1;
+        let tasks = JSON.parse(localStorage.getItem('todoTasks')) || [];
+
+        // 页面加载时渲染任务
+        document.addEventListener('DOMContentLoaded', function() {
+            renderAllTasks();
+            updateTaskCounts();
+        });
+
+        // 回车键添加任务
+        document.getElementById('taskInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addTask();
+            }
+        });
+
+        function addTask() {
+            const input = document.getElementById('taskInput');
+            const taskText = input.value.trim();
+            
+            if (taskText === '') {
+                alert('请输入任务内容！');
+                return;
+            }
+
+            const task = {
+                id: taskIdCounter++,
+                text: taskText,
+                status: 'todo',
+                createdAt: new Date().toLocaleString('zh-CN')
+            };
+
+            tasks.push(task);
+            saveToLocalStorage();
+            
+            renderTask(task);
+            updateTaskCounts();
+            
+            input.value = '';
+            input.focus();
+        }
+
+        function renderTask(task) {
+            const taskElement = createTaskElement(task);
+            const targetColumn = document.querySelector(`#${task.status} .tasks`);
+            
+            // 移除空状态
+            const emptyState = targetColumn.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            targetColumn.appendChild(taskElement);
+        }
+
+        function renderAllTasks() {
+            // 清空所有列
+            ['todo', 'in-progress', 'done'].forEach(status => {
+                const tasksContainer = document.querySelector(`#${status} .tasks`);
+                tasksContainer.innerHTML = '<div class="empty-state">暂无任务</div>';
+            });
+
+            // 渲染所有任务
+            tasks.forEach(task => {
+                renderTask(task);
+            });
+
+            // 更新空状态显示
+            updateEmptyStates();
+        }
+
+        function createTaskElement(task) {
+            const taskDiv = document.createElement('div');
+            taskDiv.className = 'task';
+            taskDiv.draggable = true;
+            taskDiv.dataset.taskId = task.id;
+            
+            taskDiv.innerHTML = `
+                <div class="task-content">
+                    <div class="task-text">${escapeHtml(task.text)}</div>
+                    <div class="task-actions">
+                        <button onclick="deleteTask(${task.id})" class="delete-btn" title="删除">🗑️</button>
+                    </div>
+                </div>
+                <small class="task-date">创建于: ${task.createdAt}</small>
+            `;
+
+            // 添加拖拽事件
+            taskDiv.addEventListener('dragstart', dragStart);
+            taskDiv.addEventListener('dragend', dragEnd);
+
+            return taskDiv;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function deleteTask(taskId) {
+            if (confirm('确定要删除这个任务吗？')) {
+                tasks = tasks.filter(task => task.id !== taskId);
+                saveToLocalStorage();
+                
+                const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+                taskElement.remove();
+                
+                updateTaskCounts();
+                updateEmptyStates();
+            }
+        }
+
+        // 拖拽功能
+        function dragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
+            e.target.classList.add('dragging');
+        }
+
+        function dragEnd(e) {
+            e.target.classList.remove('dragging');
+            
+            // 移除所有列的拖拽样式
+            document.querySelectorAll('.column').forEach(col => {
+                col.classList.remove('drag-over');
+            });
+        }
+
+        function allowDrop(e) {
+            e.preventDefault();
+            
+            // 添加拖拽悬停样式
+            const column = e.currentTarget.closest('.column');
+            column.classList.add('drag-over');
+        }
+
+        function drop(e) {
+            e.preventDefault();
+            
+            const taskId = parseInt(e.dataTransfer.getData('text/plain'));
+            const targetColumn = e.currentTarget.closest('.column');
+            const newStatus = targetColumn.id;
+            
+            // 移除拖拽样式
+            targetColumn.classList.remove('drag-over');
+            
+            // 更新任务状态
+            updateTaskStatus(taskId, newStatus);
+        }
+
+        // 防止拖拽离开时还显示悬停样式
+        document.querySelectorAll('.column').forEach(column => {
+            column.addEventListener('dragleave', function(e) {
+                if (!column.contains(e.relatedTarget)) {
+                    column.classList.remove('drag-over');
+                }
+            });
+        });
+
+        function updateTaskStatus(taskId, newStatus) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task && task.status !== newStatus) {
+                task.status = newStatus;
+                task.updatedAt = new Date().toLocaleString('zh-CN');
+                
+                saveToLocalStorage();
+                
+                // 重新渲染任务
+                const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+                if (taskElement) {
+                    taskElement.remove();
+                }
+                
+                renderTask(task);
+                updateTaskCounts();
+                updateEmptyStates();
+            }
+        }
+
+        function updateTaskCounts() {
+            const counts = {
+                'todo': 0,
+                'in-progress': 0,
+                'done': 0
+            };
+
+            tasks.forEach(task => {
+                counts[task.status]++;
+            });
+
+            Object.keys(counts).forEach(status => {
+                document.getElementById(`${status}-count`).textContent = counts[status];
+            });
+        }
+
+        function updateEmptyStates() {
+            ['todo', 'in-progress', 'done'].forEach(status => {
+                const tasksContainer = document.querySelector(`#${status} .tasks`);
+                const taskElements = tasksContainer.querySelectorAll('.task');
+                const emptyState = tasksContainer.querySelector('.empty-state');
+                
+                if (taskElements.length === 0 && !emptyState) {
+                    const emptyDiv = document.createElement('div');
+                    emptyDiv.className = 'empty-state';
+                    emptyDiv.textContent = getEmptyMessage(status);
+                    tasksContainer.appendChild(emptyDiv);
+                } else if (taskElements.length > 0 && emptyState) {
+                    emptyState.remove();
+                }
+            });
+        }
+
+        function getEmptyMessage(status) {
+            const messages = {
+                'todo': '暂无待办任务',
+                'in-progress': '暂无进行中任务',
+                'done': '暂无已完成任务'
+            };
+            return messages[status];
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('todoTasks', JSON.stringify(tasks));
+        }
+
+        // 清空所有已完成任务
+        function clearCompleted() {
+            if (confirm('确定要清空所有已完成的任务吗？')) {
+                tasks = tasks.filter(task => task.status !== 'done');
+                saveToLocalStorage();
+                renderAllTasks();
+                updateTaskCounts();
+            }
+        }
+
+        // 可以添加清空已完成任务的按钮（可选）
+        // 在已完成列的header中添加清空按钮
+        document.querySelector('#done .column-header').innerHTML += `
+            <button onclick="clearCompleted()" style="
+                background: #e53e3e; 
+                color: white; 
+                border: none; 
+                padding: 4px 8px; 
+                border-radius: 4px; 
+                font-size: 11px; 
+                cursor: pointer;
+                margin-left: 10px;
+            ">清空</button>
+        `;
+    </script>
+</body>
+</html>
+```
+
+这个 TodoList 看板具有以下功能特点：
+
+## 🌟 主要功能
+1. **三列布局**：待办、进行中、已完成
+2. **拖拽操作**：任务可以在不同状态之间拖拽移动
+3. **添加任务**：支持键盘回车和按钮添加
+4. **删除任务**：每个任务都有删除按钮
+5. **任务计数**：实时显示每列的任务数量
+6. **数据持久化**：使用 localStorage 保存数据
+
+## 🎨 界面特色
+- **现代化设计**：渐变背景、卡片式布局
+- **响应式适配**：移动设备友好
+- **动画效果**：悬停、拖拽、过渡动画
+- **状态区分**：不同状态有不同的颜色标识
+- **空状态提示**：无任务时显示友好提示
+
+## 🔧 操作说明
+1. 在顶部输入框输入任务内容，按回车或点击添加按钮
+2. 拖拽任务到不同列改变状态
+3. 点击垃圾桶图标删除任务
+4. 已完成的任务会显示删除线
+5. 可以点击"清空"按钮清除所有已完成任务
+
+这个看板适合个人或团队使用，界面清晰直观，操作简便流畅！
