@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TodoList 看板</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #0b1220;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --primary: #22d3ee;
+      --accent: #a78bfa;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --border: #22314f;
+      --card: #0b1120;
+      --drag: #1f2937;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #0b0f1a 0%, #111827 100%);
+      color: var(--text);
+      font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10, 14, 26, 0.7);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .title-badge {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #0b1120;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .search {
+      position: relative;
+    }
+    .search input {
+      width: 260px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      outline: none;
+    }
+    .btn {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .btn.primary {
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.15), rgba(167, 139, 250, 0.15));
+      border-color: #2a3b5f;
+    }
+    .btn:hover { filter: brightness(1.05); }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      padding: 16px;
+      flex: 1;
+    }
+    @media (max-width: 960px) {
+      .board { grid-template-columns: 1fr; }
+    }
+    .column {
+      display: flex;
+      flex-direction: column;
+      background: rgba(11, 17, 32, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      min-height: 200px;
+      overflow: hidden;
+    }
+    .column-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 12px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(16, 24, 40, 0.4);
+    }
+    .column-title {
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .count {
+      font-size: 12px;
+      color: var(--muted);
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px 6px;
+    }
+    .task-list {
+      flex: 1;
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+      min-height: 120px;
+    }
+    .task {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      transition: transform .08s ease, background .2s ease, border-color .2s ease;
+    }
+    .task.dragging {
+      opacity: .85;
+      transform: scale(1.01);
+      background: var(--drag);
+      border-color: #475569;
+    }
+    .task-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .task-title {
+      flex: 1;
+      font-weight: 600;
+    }
+    .task-meta {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .priority {
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+    }
+    .p-high { background: rgba(239, 68, 68, .15); color: #fecaca; border-color: #7f1d1d; }
+    .p-medium { background: rgba(245, 158, 11, .15); color: #fde68a; border-color: #78350f; }
+    .p-low { background: rgba(34, 197, 94, .15); color: #bbf7d0; border-color: #14532d; }
+    .task-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .task-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .icon-btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 6px 8px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .icon-btn.danger { color: #fecaca; border-color: #7f1d1d; }
+    .icon-btn.success { color: #bbf7d0; border-color: #14532d; }
+    .icon-btn.warn { color: #fde68a; border-color: #78350f; }
+    .checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .checkbox input { accent-color: var(--primary); }
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 16px 8px 24px;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+    }
+
+    .new-task {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 8px;
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(16, 24, 40, 0.35);
+    }
+    .new-task input, .new-task select {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      outline: none;
+    }
+    footer {
+      padding: 10px 16px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      background: rgba(10,14,26,.4);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .link { color: var(--primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div class="title">
+        TodoList 看板
+        <span class="title-badge">KANBAN</span>
+      </div>
+      <div class="actions">
+        <div class="search">
+          <input id="search" type="text" placeholder="搜索任务（标题/描述/标签）…">
+        </div>
+        <button id="clearDone" class="btn">清除已完成</button>
+        <button id="exportBtn" class="btn">导出 JSON</button>
+        <button id="importBtn" class="btn">导入 JSON</button>
+        <input id="importFile" type="file" accept="application/json" style="display:none;">
+      </div>
+    </div>
+    <div class="new-task">
+      <input id="titleInput" type="text" placeholder="任务标题（回车快速添加）">
+      <input id="tagInput" type="text" placeholder="标签（例如：学习, 工作）">
+      <select id="prioritySelect" title="优先级">
+        <option value="medium">中</option>
+        <option value="high">高</option>
+        <option value="low">低</option>
+      </select>
+      <button id="addBtn" class="btn primary">添加任务</button>
+    </div>
+  </header>
+
+  <main class="board">
+    <section class="column" data-status="todo">
+      <div class="column-header">
+        <div class="column-title">待处理 <span class="count" id="count-todo">0</span></div>
+        <div class="column-tools"></div>
+      </div>
+      <div class="task-list" id="list-todo"></div>
+    </section>
+
+    <section class="column" data-status="doing">
+      <div class="column-header">
+        <div class="column-title">进行中 <span class="count" id="count-doing">0</span></div>
+        <div class="column-tools"></div>
+      </div>
+      <div class="task-list" id="list-doing"></div>
+    </section>
+
+    <section class="column" data-status="done">
+      <div class="column-header">
+        <div class="column-title">已完成 <span class="count" id="count-done">0</span></div>
+        <div class="column-tools"></div>
+      </div>
+      <div class="task-list" id="list-done"></div>
+    </section>
+  </main>
+
+  <footer>
+    <div>本地保存：自动保存到浏览器 LocalStorage</div>
+    <div>快捷键：Enter 添加；/ 聚焦搜索；Ctrl+K 清空搜索；拖拽任务跨列移动</div>
+  </footer>
+
+  <script>
+    const STORAGE_KEY = 'kanban_tasks_v1';
+
+    const el = {
+      titleInput: document.getElementById('titleInput'),
+      tagInput: document.getElementById('tagInput'),
+      prioritySelect: document.getElementById('prioritySelect'),
+      addBtn: document.getElementById('addBtn'),
+      search: document.getElementById('search'),
+      lists: {
+        todo: document.getElementById('list-todo'),
+        doing: document.getElementById('list-doing'),
+        done: document.getElementById('list-done'),
+      },
+      count: {
+        todo: document.getElementById('count-todo'),
+        doing: document.getElementById('count-doing'),
+        done: document.getElementById('count-done'),
+      },
+      clearDone: document.getElementById('clearDone'),
+      exportBtn: document.getElementById('exportBtn'),
+      importBtn: document.getElementById('importBtn'),
+      importFile: document.getElementById('importFile'),
+    };
+
+    let state = loadState();
+
+    function uid() {
+      return 't_' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return { tasks: [] };
+        const data = JSON.parse(raw);
+        if (!Array.isArray(data.tasks)) return { tasks: [] };
+        return data;
+      } catch {
+        return { tasks: [] };
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function addTask(title, priority = 'medium', tags = []) {
+      const task = {
+        id: uid(),
+        title: title.trim(),
+        desc: '',
+        priority,
+        tags,
+        status: 'todo', // todo | doing | done
+        done: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      state.tasks.unshift(task);
+      saveState();
+      render();
+    }
+
+    function updateTask(id, patch) {
+      const t = state.tasks.find(x => x.id === id);
+      if (!t) return;
+      Object.assign(t, patch, { updatedAt: Date.now() });
+      if (t.status === 'done') t.done = true;
+      if (t.status !== 'done') t.done = false;
+      saveState();
+      render();
+    }
+
+    function deleteTask(id) {
+      state.tasks = state.tasks.filter(x => x.id !== id);
+      saveState();
+      render();
+    }
+
+    function moveTask(id, status) {
+      updateTask(id, { status, done: status === 'done' });
+    }
+
+    function filterTasks() {
+      const q = el.search.value.trim().toLowerCase();
+      if (!q) return state.tasks;
+      return state.tasks.filter(t => {
+        return (
+          t.title.toLowerCase().includes(q) ||
+          (t.desc && t.desc.toLowerCase().includes(q)) ||
+          (t.tags || []).some(tag => tag.toLowerCase().includes(q))
+        );
+      });
+    }
+
+    function render() {
+      const filtered = filterTasks();
+      const byStatus = { todo: [], doing: [], done: [] };
+      filtered.forEach(t => { (byStatus[t.status] || byStatus.todo).push(t); });
+
+      ['todo', 'doing', 'done'].forEach(st => {
+        const list = el.lists[st];
+        list.innerHTML = '';
+        if (byStatus[st].length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = '拖拽任务到这里或新建一个任务';
+          list.appendChild(empty);
+        } else {
+          byStatus[st].forEach(t => list.appendChild(renderTask(t)));
+        }
+        el.count[st].textContent = byStatus[st].length;
+      });
+
+      initDropzones();
+    }
+
+    function renderTask(t) {
+      const item = document.createElement('div');
+      item.className = 'task';
+      item.setAttribute('draggable', 'true');
+      item.dataset.id = t.id;
+
+      item.innerHTML = `
+        <div class="task-top">
+          <label class="checkbox">
+            <input type="checkbox" ${t.done ? 'checked' : ''} />
+            <span>完成</span>
+          </label>
+          <div class="task-title" contenteditable="true" spellcheck="false" title="点击编辑标题"></div>
+          <span class="priority ${priorityClass(t.priority)}" title="优先级">${priorityText(t.priority)}</span>
+        </div>
+        <div class="task-meta">
+          <span title="创建时间">${formatTime(t.createdAt)}</span>
+          <span>•</span>
+          <span title="标签">${(t.tags || []).join(', ') || '无标签'}</span>
+        </div>
+        <div class="task-bottom">
+          <div class="task-actions">
+            <button class="icon-btn warn btn-priority">切换优先级</button>
+            <button class="icon-btn success btn-forward">${nextLabel(t.status)}</button>
+            <button class="icon-btn danger btn-del">删除</button>
+          </div>
+          <div class="task-actions">
+            <button class="icon-btn btn-edit-tags">标签</button>
+          </div>
+        </div>
+      `;
+
+      item.querySelector('.task-title').textContent = t.title;
+
+      // Drag events
+      item.addEventListener('dragstart', e => {
+        item.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', t.id);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      item.addEventListener('dragend', () => item.classList.remove('dragging'));
+
+      // Checkbox toggle
+      item.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+        const done = e.target.checked;
+        moveTask(t.id, done ? 'done' : 'todo');
+      });
+
+      // Title edit
+      const titleEl = item.querySelector('.task-title');
+      titleEl.addEventListener('blur', () => {
+        const newTitle = titleEl.textContent.trim();
+        if (newTitle && newTitle !== t.title) updateTask(t.id, { title: newTitle });
+        else titleEl.textContent = t.title; // restore
+      });
+      titleEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          titleEl.blur();
+        }
+      });
+
+      // Priority toggle
+      item.querySelector('.btn-priority').addEventListener('click', () => {
+        const order = ['low', 'medium', 'high'];
+        const idx = order.indexOf(t.priority);
+        const next = order[(idx + 1) % order.length];
+        updateTask(t.id, { priority: next });
+      });
+
+      // Forward status
+      item.querySelector('.btn-forward').addEventListener('click', () => {
+        const next = nextStatus(t.status);
+        moveTask(t.id, next);
+      });
+
+      // Delete
+      item.querySelector('.btn-del').addEventListener('click', () => {
+        if (confirm('确认删除该任务？')) deleteTask(t.id);
+      });
+
+      // Edit tags
+      item.querySelector('.btn-edit-tags').addEventListener('click', () => {
+        const current = (t.tags || []).join(', ');
+        const res = prompt('编辑标签（用逗号分隔）', current);
+        if (res !== null) {
+          const tags = res.split(',').map(s => s.trim()).filter(Boolean);
+          updateTask(t.id, { tags });
+        }
+      });
+
+      return item;
+    }
+
+    function priorityClass(p) {
+      return p === 'high' ? 'p-high' : p === 'low' ? 'p-low' : 'p-medium';
+    }
+    function priorityText(p) {
+      return p === 'high' ? '高' : p === 'low' ? '低' : '中';
+    }
+    function nextStatus(s) {
+      if (s === 'todo') return 'doing';
+      if (s === 'doing') return 'done';
+      return 'todo';
+    }
+    function nextLabel(s) {
+      return s === 'todo' ? '开始 →' : s === 'doing' ? '完成 →' : '重开 →';
+    }
+    function formatTime(ts) {
+      const d = new Date(ts);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function initDropzones() {
+      document.querySelectorAll('.task-list').forEach(zone => {
+        zone.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        });
+        zone.addEventListener('drop', e => {
+          e.preventDefault();
+          const id = e.dataTransfer.getData('text/plain');
+          const status = zone.parentElement.dataset.status;
+          moveTask(id, status);
+        });
+      });
+    }
+
+    // Event: add task
+    function handleAdd() {
+      const title = el.titleInput.value.trim();
+      if (!title) return;
+      const priority = el.prioritySelect.value;
+      const tags = el.tagInput.value.split(',').map(x => x.trim()).filter(Boolean);
+      addTask(title, priority, tags);
+      el.titleInput.value = '';
+      el.tagInput.value = '';
+      el.titleInput.focus();
+    }
+
+    el.addBtn.addEventListener('click', handleAdd);
+    el.titleInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleAdd();
+    });
+    el.tagInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleAdd();
+    });
+
+    // Search
+    el.search.addEventListener('input', render);
+    window.addEventListener('keydown', e => {
+      if (e.key === '/' && document.activeElement !== el.search) {
+        e.preventDefault();
+        el.search.focus();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        el.search.value = '';
+        render();
+      }
+    });
+
+    // Clear done
+    el.clearDone.addEventListener('click', () => {
+      if (confirm('删除所有已完成任务？')) {
+        state.tasks = state.tasks.filter(t => !t.done);
+        saveState();
+        render();
+      }
+    });
+
+    // Export / Import
+    el.exportBtn.addEventListener('click', () => {
+      const data = JSON.stringify(state, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kanban_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    el.importBtn.addEventListener('click', () => el.importFile.click());
+    el.importFile.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data || !Array.isArray(data.tasks)) throw new Error('格式错误');
+        if (!confirm('导入将覆盖当前数据，确认继续？')) return;
+        state = data;
+        saveState();
+        render();
+      } catch (err) {
+        alert('导入失败：' + err.message);
+      } finally {
+        e.target.value = '';
+      }
+    });
+
+    // Initial demo data if empty
+    if (state.tasks.length === 0) {
+      addTask('示例：了解本看板用法', 'medium', ['demo']);
+      moveTask(state.tasks[0].id, 'doing');
+      addTask('示例：支持拖拽在列间移动', 'high', ['拖拽','demo']);
+      addTask('示例：设置优先级和标签', 'low', ['标签','demo']);
+    } else {
+      render();
+    }
+  </script>
+</body>
+</html>

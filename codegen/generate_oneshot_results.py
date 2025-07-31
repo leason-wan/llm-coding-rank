@@ -99,7 +99,8 @@ def main():
         "anthropic/claude-sonnet-4",
         "z-ai/glm-4.5-air:free",
         "moonshotai/kimi-k2:free",
-        "qwen/qwen3-coder:free"
+        "qwen/qwen3-coder:free",
+        "openrouter/horizon-alpha"
     ]
 
     # Find all one-shot folders

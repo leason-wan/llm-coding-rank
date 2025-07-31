@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>三维建筑定向爆破演示 - three.js + cannon-es</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<style>
+  html, body {
+    margin: 0; padding: 0; overflow: hidden; background: #0b0b0b; color: #eee; font-family: system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Microsoft YaHei, Arial, sans-serif;
+  }
+  #ui {
+    position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; gap: 8px; flex-wrap: wrap;
+    background: rgba(0,0,0,0.35); padding: 8px 10px; border-radius: 6px; backdrop-filter: blur(2px);
+  }
+  button, select {
+    background: #1e1e1e; color: #eee; border: 1px solid #444; padding: 6px 10px; border-radius: 4px; cursor: pointer;
+  }
+  button:hover, select:hover { background: #2a2a2a; }
+  #info {
+    position: absolute; right: 12px; top: 12px; background: rgba(0,0,0,0.35); padding: 8px 10px; border-radius: 6px; font-size: 12px;
+  }
+  #credit {
+    position: absolute; left: 12px; bottom: 12px; opacity: .7; font-size: 12px;
+  }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <button id="btnExplode">爆炸</button>
+  <button id="btnReset">重置</button>
+  <select id="viewSelect">
+    <option value="orbit">自由视角</option>
+    <option value="front">正面</option>
+    <option value="top">俯视</option>
+    <option value="iso">等距</option>
+  </select>
+</div>
+<div id="info">
+  鼠标左键：旋转视角<br/>
+  鼠标右键：平移位置<br/>
+  滚轮：缩放焦距
+</div>
+<div id="credit">three.js + cannon-es 拆除演示</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
+
+let renderer, scene, camera, controls;
+let world;
+let bricks = [];         // {mesh, body}
+let groundMesh, groundBody;
+let ambient, dirLight;
+let smokeSystem, dustSystem; // 粒子系统
+let clock;
+let exploded = false;
+let stabilizing = false;
+let initializing = false;
+let sleepAfterInit = true;
+
+const params = {
+  groundSize: 80,
+  groundColor: 0x2a2a2a,   // 深灰混凝土
+  building: {
+    circumferenceBlocks: 20,
+    heightBlocks: 60,
+    // 单砖尺寸（现实砖约 20x10x6 cm，这里放大一些以便可视）
+    brickW: 1.0,   // 周向宽度
+    brickH: 0.6,   // 垂直高度
+    brickD: 0.5,   // 径向厚度
+    // 圆形半径，基于周向块数与砖宽，使砖块严格贴合
+    // 周长 = 2πr ≈ 20 * brickW
+    // r ≈ (20 * brickW) / (2π)
+    // 为确保无间隙，可略微减小半径使砖间微重叠
+    radiusScale: 0.98,
+    color: 0xead7b3 // 米色外墙
+  },
+  physics: {
+    gravity: -9.82,
+    // 砖-砖接触，模拟砂浆粘合：高摩擦、低弹性
+    friction: 0.85,    // >= 0.8
+    restitution: 0.03, // < 0.05
+    linearDamping: 0.02,
+    angularDamping: 0.02,
+    allowSleep: true,
+    sleepSpeedLimit: 0.05, // 速度阈值
+    sleepTimeLimit: 0.6    // 持续时间
+  },
+  explosion: {
+    radius: 2.0,
+    minForce: 2.0,
+    maxForce: 5.0
+  },
+  visuals: {
+    envIntensityBase: 0.6,
+    envIntensityBlast: 2.5,
+    fogColor: 0x111111,
+    smokeCount: 1600,
+    dustCount: 2200
+  }
+};
+
+init();
+animate();
+
+async function init() {
+  initializing = true;
+  clock = new THREE.Clock();
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  // Scene & Camera
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b0b0b);
+  scene.fog = new THREE.Fog(params.visuals.fogColor, 50, 160);
+
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 400);
+  camera.position.set(40, 35, 60);
+
+  // Controls
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.07;
+  controls.enablePan = true;
+  controls.panSpeed = 0.8;
+  controls.rotateSpeed = 0.8;
+  controls.zoomSpeed = 1.0;
+  controls.target.set(0, params.building.heightBlocks * params.building.brickH * 0.33, 0);
+
+  // Lights
+  ambient = new THREE.AmbientLight(0xffffff, params.visuals.envIntensityBase);
+  scene.add(ambient);
+
+  dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
+  dirLight.position.set(30, 60, 20);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(2048, 2048);
+  dirLight.shadow.camera.left = -80;
+  dirLight.shadow.camera.right = 80;
+  dirLight.shadow.camera.top = 80;
+  dirLight.shadow.camera.bottom = -80;
+  dirLight.shadow.camera.far = 220;
+  scene.add(dirLight);
+
+  // Ground
+  const gSize = params.groundSize;
+  const groundGeo = new THREE.PlaneGeometry(gSize, gSize);
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: params.groundColor, roughness: 1.0, metalness: 0.0
+  });
+  groundMesh = new THREE.Mesh(groundGeo, groundMat);
+  groundMesh.rotation.x = -Math.PI/2;
+  groundMesh.receiveShadow = true;
+  scene.add(groundMesh);
+
+  // Physics world
+  world = new CANNON.World({
+    gravity: new CANNON.Vec3(0, params.physics.gravity, 0),
+    allowSleep: params.physics.allowSleep
+  });
+
+  // Contact properties
+  const defaultMat = new CANNON.Material('default');
+  const brickMat = new CANNON.Material('brick');
+  const contact = new CANNON.ContactMaterial(brickMat, brickMat, {
+    friction: params.physics.friction,
+    restitution: params.physics.restitution
+  });
+  const contactGround = new CANNON.ContactMaterial(brickMat, defaultMat, {
+    friction: params.physics.friction,
+    restitution: params.physics.restitution
+  });
+  world.defaultContactMaterial = new CANNON.ContactMaterial(defaultMat, defaultMat, {
+    friction: 0.5,
+    restitution: 0.01
+  });
+  world.addContactMaterial(contact);
+  world.addContactMaterial(contactGround);
+
+  // Ground physics
+  const groundBodyShape = new CANNON.Plane();
+  groundBody = new CANNON.Body({ mass: 0, material: defaultMat });
+  groundBody.addShape(groundBodyShape);
+  groundBody.quaternion.setFromEuler(-Math.PI/2, 0, 0);
+  world.addBody(groundBody);
+
+  // Build building
+  buildCircularBuilding(brickMat);
+
+  // Particles
+  buildSmokeAndDust();
+
+  // Let physics settle a few steps and force sleep
+  await settleAndSleep();
+
+  // UI
+  setupUI();
+
+  initializing = false;
+}
+
+function buildCircularBuilding(brickMat) {
+  // Derived geometry
+  const { circumferenceBlocks: N, heightBlocks: H, brickW: bw, brickH: bh, brickD: bd, radiusScale, color } = params.building;
+
+  // 精确半径，略缩以确保紧密贴合（甚至轻微重叠）
+  const rIdeal = (N * bw) / (2 * Math.PI);
+  const radius = rIdeal * radiusScale;
+
+  // 圆环每层摆放 N 块，下一层错开半块砖（50%）
+  // 外观用米色材质
+  const mat = new THREE.MeshStandardMaterial({
+    color: color,
+    roughness: 0.9,
+    metalness: 0.0
+  });
+
+  const geo = new THREE.BoxGeometry(bw, bh, bd);
+
+  // 统一质量（相对值，比例 OK）
+  const brickMass = 1.0;
+
+  // 物理盒形状
+  const halfExtents = new CANNON.Vec3(bw/2, bh/2, bd/2);
+  const boxShape = new CANNON.Box(halfExtents);
+
+  const angleStep = (Math.PI * 2) / N;
+
+  const yBase = bh / 2; // 地面上第一层中心的高度
+
+  for (let layer = 0; layer < H; layer++) {
+    const y = yBase + layer * bh;
+    const offset = (layer % 2) ? 0.5 : 0.0; // 50% 错缝
+
+    for (let i = 0; i < N; i++) {
+      const idxFloat = i + offset;
+      const theta = idxFloat * angleStep;
+
+      const cx = Math.cos(theta);
+      const cz = Math.sin(theta);
+
+      // 砖块中心放在半径 r 处，面向中心
+      const x = cx * radius;
+      const z = cz * radius;
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = false;
+      mesh.position.set(x, y, z);
+
+      // 砖的朝向：使其宽度沿切向，厚度沿径向
+      // 则需要旋转使其局部Z朝径向外
+      // 砖的长边沿切线，厚度向向内/外
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(cx, 0, cz)
+      );
+
+      scene.add(mesh);
+
+      const body = new CANNON.Body({
+        mass: brickMass,
+        material: brickMat,
+        linearDamping: params.physics.linearDamping,
+        angularDamping: params.physics.angularDamping,
+        allowSleep: params.physics.allowSleep
+      });
+      body.addShape(boxShape);
+      body.position.set(x, y, z);
+
+      // 同步旋转
+      const q = new CANNON.Quaternion();
+      const threeQ = mesh.quaternion;
+      q.set(threeQ.x, threeQ.y, threeQ.z, threeQ.w);
+      body.quaternion.copy(q);
+
+      // 睡眠参数
+      body.sleepSpeedLimit = params.physics.sleepSpeedLimit;
+      body.sleepTimeLimit = params.physics.sleepTimeLimit;
+
+      world.addBody(body);
+
+      bricks.push({ mesh, body, layer, i });
+    }
+  }
+}
+
+async function settleAndSleep() {
+  // 在初始化后，先运行若干短步模拟以挤压微小重叠
+  stabilizing = true;
+
+  const dt = 1/240;
+  for (let i = 0; i < 240; i++) {
+    world.step(dt);
+  }
+
+  // 强制全部睡眠，防止任何轻微晃动或下沉
+  bricks.forEach(({ body }) => {
+    body.velocity.set(0, 0, 0);
+    body.angularVelocity.set(0, 0, 0);
+    body.sleep();
+  });
+
+  stabilizing = false;
+}
+
+function setupUI() {
+  const btnExplode = document.getElementById('btnExplode');
+  const btnReset = document.getElementById('btnReset');
+  const viewSelect = document.getElementById('viewSelect');
+
+  btnExplode.addEventListener('click', () => triggerExplosion());
+  btnReset.addEventListener('click', () => resetScene());
+  viewSelect.addEventListener('change', () => {
+    const v = viewSelect.value;
+    if (v === 'front') {
+      camera.position.set(0, 28, 95);
+      controls.target.set(0, 25, 0);
+    } else if (v === 'top') {
+      camera.position.set(0, 140, 0);
+      controls.target.set(0, 10, 0);
+    } else if (v === 'iso') {
+      camera.position.set(70, 50, 70);
+      controls.target.set(0, 25, 0);
+    } else {
+      camera.position.set(40, 35, 60);
+      controls.target.set(0, 25, 0);
+    }
+    controls.update();
+  });
+}
+
+function resetScene() {
+  // 清理砖与粒子
+  exploded = false;
+  bricks.forEach(({ mesh, body }) => {
+    scene.remove(mesh);
+    world.removeBody(body);
+  });
+  bricks.length = 0;
+
+  if (smokeSystem) {
+    scene.remove(smokeSystem.points);
+  }
+  if (dustSystem) {
+    scene.remove(dustSystem.points);
+  }
+
+  // 恢复光照
+  ambient.intensity = params.visuals.envIntensityBase;
+
+  // 重新构建
+  const brickMat = new CANNON.Material('brick');
+  world.addContactMaterial(new CANNON.ContactMaterial(brickMat, brickMat, {
+    friction: params.physics.friction,
+    restitution: params.physics.restitution
+  }));
+  world.addContactMaterial(new CANNON.ContactMaterial(brickMat, world.defaultContactMaterial.materials[0], {
+    friction: params.physics.friction,
+    restitution: params.physics.restitution
+  }));
+
+  buildCircularBuilding(brickMat);
+  buildSmokeAndDust();
+  settleAndSleep();
+}
+
+function triggerExplosion() {
+  if (exploded || initializing || stabilizing) return;
+  exploded = true;
+
+  // 爆炸装置位置：第一层最右侧方块附近（+X 方向）
+  const yFirstLayer = (params.building.brickH / 2);
+  const bombPos = new CANNON.Vec3(
+    (params.building.circumferenceBlocks * params.building.brickW) / (2 * Math.PI) * params.building.radiusScale + 0.2,
+    yFirstLayer,
+    0
+  );
+
+  // 唤醒相关砖块
+  bricks.forEach(({ body }) => {
+    // 唤醒所有与爆炸相关的（这里简单处理：全唤醒，更震撼）
+    body.wakeUp();
+  });
+
+  // 施加冲击波
+  const radius = params.explosion.radius;
+  const minF = params.explosion.minForce;
+  const maxF = params.explosion.maxForce;
+
+  bricks.forEach(({ body }) => {
+    const toBody = new CANNON.Vec3().copy(body.position).vsub(bombPos);
+    const dist = toBody.length();
+    if (dist <= radius) {
+      // 力方向为从爆心指向砖块方向
+      const dir = toBody.scale(1 / (dist + 1e-6));
+      // 强度按距离衰减
+      const t = 1 - (dist / radius);
+      const F = minF + (maxF - minF) * t;
+      const impulse = dir.scale(F * body.mass);
+      body.applyImpulse(impulse, body.position);
+    }
+  });
+
+  // 爆炸瞬间：环境光激增，再被烟尘遮挡变暗
+  ambient.intensity = params.visuals.envIntensityBlast;
+  setTimeout(() => {
+    ambient.intensity = params.visuals.envIntensityBase * 0.35;
+  }, 250);
+
+  // 激活粒子系统（烟雾、灰尘）
+  activateSmokeAndDust(bombPos);
+}
+
+function buildSmokeAndDust() {
+  // 烟雾
+  smokeSystem = makeParticleSystem({
+    count: params.visuals.smokeCount,
+    color: new THREE.Color(0x555555),
+    size: 1.9,
+    opacity: 0.0,
+    soft: true
+  });
+  scene.add(smokeSystem.points);
+
+  // 灰尘
+  dustSystem = makeParticleSystem({
+    count: params.visuals.dustCount,
+    color: new THREE.Color(0x9c8672),
+    size: 0.7,
+    opacity: 0.0,
+    soft: true
+  });
+  scene.add(dustSystem.points);
+}
+
+function makeParticleSystem({ count, color, size, opacity, soft }) {
+  const positions = new Float32Array(count * 3);
+  const velocities = new Float32Array(count * 3);
+  const life = new Float32Array(count);
+  const ages = new Float32Array(count);
+
+  // 初始化为不活动
+  for (let i = 0; i < count; i++) {
+    positions[i*3+0] = 0;
+    positions[i*3+1] = -9999;
+    positions[i*3+2] = 0;
+    velocities[i*3+0] = 0;
+    velocities[i*3+1] = 0;
+    velocities[i*3+2] = 0;
+    life[i] = 0;
+    ages[i] = 0;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
+  geo.setAttribute('life', new THREE.BufferAttribute(life, 1));
+  geo.setAttribute('age', new THREE.BufferAttribute(ages, 1));
+
+  const mat = new THREE.PointsMaterial({
+    color,
+    size,
+    opacity,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.NormalBlending
+  });
+
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+
+  return { points, count };
+}
+
+function activateSmokeAndDust(origin) {
+  // 在爆炸后的一段时间内不断生成粒子
+  const smoke = smokeSystem;
+  const dust = dustSystem;
+
+  // 把原点定在爆炸点附近地面处
+  const o = origin.clone();
+  o.y = Math.max(o.y, params.building.brickH / 2);
+
+  // 初始化一波粒子
+  spawnParticles(smoke, o, { spreadXY: 3.5, spreadY: 1.5, velUp: 3.0, velXY: 1.4, lifeMin: 3.5, lifeMax: 7.0, opacity: 0.85 });
+  spawnParticles(dust, o, { spreadXY: 5.5, spreadY: 1.0, velUp: 1.5, velXY: 3.2, lifeMin: 2.0, lifeMax: 4.0, opacity: 0.6 });
+
+  // 额外几次延迟喷发，营造持续倒塌扬尘
+  const pulses = 5;
+  for (let p = 1; p <= pulses; p++) {
+    setTimeout(() => {
+      spawnParticles(smoke, o, { spreadXY: 4.0, spreadY: 2.0, velUp: 2.2, velXY: 1.1, lifeMin: 3.0, lifeMax: 6.0, opacity: 0.6 });
+      spawnParticles(dust, o, { spreadXY: 6.5, spreadY: 1.2, velUp: 1.0, velXY: 2.8, lifeMin: 1.8, lifeMax: 3.6, opacity: 0.45 });
+    }, p * 350);
+  }
+}
+
+function spawnParticles(system, origin, opts) {
+  const positions = system.points.geometry.attributes.position.array;
+  const velocities = system.points.geometry.attributes.velocity.array;
+  const life = system.points.geometry.attributes.life.array;
+  const ages = system.points.geometry.attributes.age.array;
+
+  const count = system.count;
+  const nowOpacity = system.points.material.opacity;
+  system.points.material.opacity = Math.max(nowOpacity, opts.opacity || 0.7);
+
+  for (let i = 0; i < count; i++) {
+    if (life[i] <= 0) {
+      // 随机生成
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * (opts.spreadXY || 3.0);
+      const x = origin.x + Math.cos(angle) * r;
+      const z = origin.z + Math.sin(angle) * r;
+      const y = origin.y + Math.random() * (opts.spreadY || 1.0);
+
+      positions[i*3+0] = x;
+      positions[i*3+1] = y;
+      positions[i*3+2] = z;
+
+      const vx = (Math.random() * 2 - 1) * (opts.velXY || 1.2);
+      const vz = (Math.random() * 2 - 1) * (opts.velXY || 1.2);
+      const vy = (opts.velUp || 2.0) * (0.8 + Math.random()*0.6);
+
+      velocities[i*3+0] = vx;
+      velocities[i*3+1] = vy;
+      velocities[i*3+2] = vz;
+
+      life[i] = (opts.lifeMin || 2.5) + Math.random() * ((opts.lifeMax || 5.0) - (opts.lifeMin || 2.5));
+      ages[i] = 0;
+    }
+  }
+
+  system.points.geometry.attributes.position.needsUpdate = true;
+  system.points.geometry.attributes.velocity.needsUpdate = true;
+  system.points.geometry.attributes.life.needsUpdate = true;
+  system.points.geometry.attributes.age.needsUpdate = true;
+}
+
+function updateParticles(dt) {
+  if (!smokeSystem || !dustSystem) return;
+
+  const gravityY = params.physics.gravity;
+
+  const updateSys = (system, drag, buoyancy, fadeFactor) => {
+    const geom = system.points.geometry;
+    const positions = geom.attributes.position.array;
+    const velocities = geom.attributes.velocity.array;
+    const life = geom.attributes.life.array;
+    const ages = geom.attributes.age.array;
+
+    for (let i = 0; i < system.count; i++) {
+      if (life[i] > 0) {
+        // age
+        ages[i] += dt;
+        if (ages[i] >= life[i]) {
+          life[i] = 0;
+          positions[i*3+1] = -9999; // hide
+          continue;
+        }
+
+        // 简化空气阻力与浮力：横向衰减，向上带动
+        velocities[i*3+0] *= (1 - drag * dt);
+        velocities[i*3+2] *= (1 - drag * dt);
+        velocities[i*3+1] += (-gravityY * 0.02 + buoyancy) * dt; // 轻微向上
+
+        positions[i*3+0] += velocities[i*3+0] * dt;
+        positions[i*3+1] += velocities[i*3+1] * dt;
+        positions[i*3+2] += velocities[i*3+2] * dt;
+      }
+    }
+
+    geom.attributes.position.needsUpdate = true;
+
+    // 淡出
+    const mat = system.points.material;
+    mat.opacity *= (1 - fadeFactor * dt);
+    mat.opacity = Math.max(0, Math.min(1, mat.opacity));
+  };
+
+  // 烟雾：更慢、更飘
+  updateSys(smokeSystem, 0.25, 0.55, 0.04);
+  // 灰尘：扩散较快但更快沉降
+  updateSys(dustSystem, 0.35, 0.15, 0.09);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 1/30);
+
+  // Physics
+  if (world && !initializing) {
+    const fixedTimeStep = 1/120;
+    const maxSubSteps = 3;
+    world.step(fixedTimeStep, dt, maxSubSteps);
+
+    // Sync meshes
+    for (let i = 0; i < bricks.length; i++) {
+      const { mesh, body } = bricks[i];
+      mesh.position.copy(body.position);
+      mesh.quaternion.copy(body.quaternion);
+    }
+  }
+
+  // 粒子更新
+  updateParticles(dt);
+
+  // 控制器
+  controls.update();
+
+  renderer.render(scene, camera);
+}
+
+</script>
+</body>
+</html>
