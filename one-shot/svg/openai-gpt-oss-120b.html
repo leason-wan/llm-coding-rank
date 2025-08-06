@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+    width="400" height="300"
+    viewBox="0 0 400 300"
+    xmlns="http://www.w3.org/2000/svg"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    version="1.1">
+
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#e6f7ff"/>
+
+  <!-- Bicycle group -->
+  <g id="bike" transform="translate(120,170)">
+    <!-- Frame -->
+    <polygon points="0,0  65,-30  115,-30  170,0"
+             fill="#555" stroke="#333" stroke-width="2"/>
+    <!-- Hand‑bars -->
+    <line x1="65" y1="-30" x2="55" y2="-45"
+          stroke="#333" stroke-width="4"/>
+    <line x1="55" y1="-45" x2="55" y2="-20"
+          stroke="#333" stroke-width="4"/>
+    <!-- Seat -->
+    <rect x="115" y="-30" width="30" height="8"
+          fill="#777" stroke="#333" stroke-width="2"/>
+
+    <!-- Wheels -->
+    <circle cx="0" cy="0" r="45"
+            fill="none" stroke="#333" stroke-width="6"/>
+    <circle cx="170" cy="0" r="45"
+            fill="none" stroke="#333" stroke-width="6"/>
+
+    <!-- Pedal and Crank -->
+    <line x1="0" y1="0" x2="55" y2="25"
+          stroke="#333" stroke-width="4"/>
+    <circle cx="55" cy="25" r="8"
+            fill="#999" stroke="#333" stroke-width="2"/>
+
+    <!-- Chain stay -->
+    <line x1="0" y1="0" x2="80" y2="0"
+          stroke="#333" stroke-width="4"/>
+  </g>
+
+  <!-- Pelican group (positioned to sit on the bike) -->
+  <g id="pelican" transform="translate(120,130)">
+    <!-- Body -->
+    <ellipse cx="85" cy="0" rx="55" ry="35"
+             fill="#b2d0ff" stroke="#336" stroke-width="2"/>
+    <!-- Head -->
+    <circle cx="85" cy="-45" r="25"
+            fill="#b2d0ff" stroke="#336" stroke-width="2"/>
+    <!-- Beak -->
+    <polygon points="85,-55  100,-48  85,-41"
+             fill="#ffcc66" stroke="#c96" stroke-width="1"/>
+    <!-- Eye -->
+    <circle cx="95" cy="-50" r="4" fill="#000"/>
+    <!-- Wing (simple path) -->
+    <path d="M70,5 c-15,-10 -15,-30 -5,-40"
+          fill="none" stroke="#336" stroke-width="4"/>
+    <!-- Tail (three lines) -->
+    <line x1="85" y1="35" x2="80" y2="55"
+          stroke="#336" stroke-width="4"/>
+    <line x1="85" y1="35" x2="85" y2="55"
+          stroke="#336" stroke-width="4"/>
+    <line x1="85" y1="35" x2="90" y2="55"
+          stroke="#336" stroke-width="4"/>
+
+    <!-- Legs (placed on pedals) -->
+    <g id="leg-left" transform="translate(55,25) rotate(-15)">
+      <line x1="0" y1="0" x2="0" y2="30"
+            stroke="#336" stroke-width="6"/>
+      <circle cx="0" cy="30" r="7"
+              fill="#336"/>
+    </g>
+    <g id="leg-right" transform="translate(115,25) rotate(15)">
+      <line x1="0" y1="0" x2="0" y2="30"
+            stroke="#336" stroke-width="6"/>
+      <circle cx="0" cy="30" r="7"
+              fill="#336"/>
+    </g>
+  </g>
+
+  <!-- Simple ground line -->
+  <line x1="0" y1="260" x2="400" y2="260"
+        stroke="#666" stroke-width="3"/>
+</svg>

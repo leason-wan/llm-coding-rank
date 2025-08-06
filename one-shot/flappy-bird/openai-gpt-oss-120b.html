@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Flappy Bird (HTML5 Canvas) 简单实现</title>
+<style>
+    *{margin:0; padding:0; box-sizing:border-box;}
+    canvas{background:#70c5ce; display:block; margin:0 auto;}
+    #overlay{
+        position:absolute; top:0; left:0; right:0; bottom:0;
+        display:flex; align-items:center; justify-content:center;
+        background:rgba(0,0,0,0.5); color:#fff; font-size:2rem;
+        visibility:hidden;
+    }
+</style>
+</head>
+<body>
+<canvas id="game" width="400" height="600"></canvas>
+<div id="overlay">Click / Space to Start</div>
+
+<script>
+/* ====================  配置 & 常量  ==================== */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// 小鸟
+const BIRD = {
+    w: 34, h: 24,
+    x: 80, y: 150,
+    vy: 0,
+    gravity: 0.5,
+    jump: -8,
+    radius: 12   // 用于碰撞检测（近似圆形）
+};
+
+// 管子
+const PIPE = {
+    width: 52,
+    gap: 120,               // 上下管之间的间隙
+    speed: 2,
+    minHeight: 50,          // 上管最小高度
+    maxHeight: H - 50 - 120 // 下管最小高度
+};
+
+// 分数与游戏状态
+let score = 0;
+let highScore = 0;
+let pipes = [];   // 动态管子数组
+let isRunning = false;
+let isGameOver = false;
+
+/* ====================  资源  ==================== */
+// 为了保持示例简洁，直接使用 Canvas 绘制小鸟和管子。
+// 如想使用图片，只需把 BIRD 绘制改为 drawImage。
+
+/* ====================  辅助函数  ==================== */
+function rand(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+function reset() {
+    // 重新初始化所有变量
+    BIRD.y = 150; BIRD.vy = 0;
+    pipes = [];
+    score = 0;
+    isRunning = false;
+    isGameOver = false;
+    document.getElementById('overlay').style.visibility = 'visible';
+}
+
+/* ====================  主循环  ==================== */
+function update() {
+    if (!isRunning) return; // 还未开始时不更新
+
+    // 1. 小鸟运动
+    BIRD.vy += BIRD.gravity;
+    BIRD.y += BIRD.vy;
+
+    // 防止小鸟飞出画面（上限/下限）
+    if (BIRD.y < 0) {
+        BIRD.y = 0;
+        BIRD.vy = 0;
+    }
+    if (BIRD.y + BIRD.h > H) {
+        BIRD.y = H - BIRD.h;
+        endGame();
+    }
+
+    // 2. 管子移动
+    for (let i = 0; i < pipes.length; i++) {
+        pipes[i].x -= PIPE.speed;
+    }
+
+    // 3. 移除离开屏幕的管子并计分
+    if (pipes.length && pipes[0].x + PIPE.width < 0) {
+        pipes.shift(); // 移除最左侧的管子
+        score++;
+        // 记录最高分
+        if (score > highScore) highScore = score;
+    }
+
+    // 4. 碰撞检测
+    for (let i = 0; i < pipes.length; i++) {
+        const p = pipes[i];
+        // 小鸟的左右范围
+        const bx1 = BIRD.x;
+        const bx2 = BIRD.x + BIRD.w;
+        // 上管左右范围
+        const upx1 = p.x, upx2 = p.x + PIPE.width;
+        // 检查水平重叠
+        const hOverlap = (bx2 > upx1 && bx1 < upx2);
+        if (hOverlap) {
+            // 垂直范围
+            const upy1 = 0, upy2 = p.top;                 // 上管
+            const downy1 = p.top + PIPE.gap, downy2 = H;   // 下管
+            const birdTop = BIRD.y, birdBottom = BIRD.y + BIRD.h;
+            // 若在管子之间的空隙外，则碰撞
+            if (birdTop < upy2 || birdBottom > downy1) {
+                endGame();
+            }
+        }
+    }
+
+    // 5. 自动生成新管子
+    // 当最后一组管子到达画面中心时生成新组
+    if (pipes.length === 0 || (pipes[pipes.length - 1].x < W - 150)) {
+        const topHeight = Math.floor(rand(PIPE.minHeight, PIPE.maxHeight));
+        pipes.push({
+            x: W,
+            top: topHeight
+        });
+    }
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+/* ====================  渲染  ==================== */
+function draw() {
+    // 清空画布
+    ctx.clearRect(0, 0, W, H);
+
+    // 1. 画小鸟
+    ctx.fillStyle = '#FFD93F';
+    ctx.beginPath();
+    ctx.arc(BIRD.x + BIRD.w / 2, BIRD.y + BIRD.h / 2, BIRD.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. 画管子
+    ctx.fillStyle = '#4EC74F';
+    for (let i = 0; i < pipes.length; i++) {
+        const p = pipes[i];
+        // 上管
+        ctx.fillRect(p.x, 0, PIPE.width, p.top);
+        // 下管
+        const bottomY = p.top + PIPE.gap;
+        ctx.fillRect(p.x, bottomY, PIPE.width, H - bottomY);
+    }
+
+    // 3. 画分数
+    ctx.fillStyle = '#fff';
+    ctx.font = '24px sans-serif';
+    ctx.fillText('Score: ' + score, 10, 30);
+    ctx.fillText('High: ' + highScore, 10, 60);
+}
+
+/* ====================  控制  ==================== */
+function startGame() {
+    if (isRunning) return;
+    isRunning = true;
+    isGameOver = false;
+    document.getElementById('overlay').style.visibility = 'hidden';
+    // 初始生成两组管子（间隔 2s）
+    pipes = [];
+    pipes.push({
+        x: W,
+        top: Math.floor(rand(PIPE.minHeight, PIPE.maxHeight))
+    });
+    requestAnimationFrame(update);
+}
+
+function endGame() {
+    isRunning = false;
+    isGameOver = true;
+    const overlay = document.getElementById('overlay');
+    overlay.innerHTML = `Game Over!<br>Score: ${score}<br>High: ${highScore}<br>Click / Space to Restart`;
+    overlay.style.visibility = 'visible';
+}
+
+/* ====================  交互  ==================== */
+document.addEventListener('keydown', e => {
+    if (e.code === 'Space') {
+        if (!isRunning) startGame();
+        else if (isGameOver) reset();
+        BIRD.vy = BIRD.jump;
+    }
+});
+document.addEventListener('mousedown', () => {
+    if (!isRunning) startGame();
+    else if (isGameOver) reset();
+    BBird.vy = BIRD.jump; // 键盘与鼠标点击同等处理
+});
+
+// 防止页面失去焦点后仍然无法接受空格键
+window.addEventListener('blur', () => {
+    if (isRunning) BIRD.vy = 0;
+});
+
+reset(); // 初始化页面
+</script>
+</body>
+</html>

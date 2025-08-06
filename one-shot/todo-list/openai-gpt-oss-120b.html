@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Todo List 看板</title>
+    <style>
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background:#f5f5f5;
+            margin:0;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            height:100vh;
+        }
+        .todo-board {
+            background:#fff;
+            width:360px;
+            padding:20px;
+            border-radius:8px;
+            box-shadow:0 4px 12px rgba(0,0,0,0.1);
+        }
+        .todo-board h2{
+            margin:0 0 10px;
+            text-align:center;
+            color:#333;
+        }
+        .input-area{
+            display:flex;
+            margin-bottom:15px;
+        }
+        .input-area input{
+            flex:1;
+            padding:8px 10px;
+            border:1px solid #ddd;
+            border-radius:4px;
+            font-size:14px;
+        }
+        .input-area button{
+            margin-left:8px;
+            padding:8px 12px;
+            background:#4caf50;
+            color:#fff;
+            border:none;
+            border-radius:4px;
+            cursor:pointer;
+        }
+        .input-area button:hover{
+            background:#45a047;
+        }
+        ul {
+            list-style:none;
+            padding:0;
+            margin:0;
+        }
+        li {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding:8px 10px;
+            border-bottom:1px solid #eee;
+        }
+        li.completed label {
+            text-decoration: line-through;
+            color:#777;
+        }
+        li button {
+            background:none;
+            border:none;
+            color:#e53935;
+            cursor:pointer;
+            font-size:14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="todo-board">
+    <h2>Todo List 看板</h2>
+
+    <div class="input-area">
+        <input type="text" id="newTask" placeholder="输入新任务...">
+        <button onclick="addTask()">添加</button>
+    </div>
+
+    <ul id="taskList"></ul>
+</div>
+
+<script>
+    // 添加任务
+    function addTask() {
+        const input = document.getElementById('newTask');
+        const text = input.value.trim();
+        if (!text) return;
+
+        const li = document.createElement('li');
+
+        const label = document.createElement('label');
+        label.textContent = text;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.onchange = function () {
+            li.classList.toggle('completed', this.checked);
+        };
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '删除';
+        delBtn.onclick = function () {
+            li.remove();
+        };
+
+        const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        left.appendChild(checkbox);
+        left.appendChild(label);
+        left.style.gap = '8px';
+
+        li.appendChild(left);
+        li.appendChild(delBtn);
+
+        document.getElementById('taskList').appendChild(li);
+        input.value = '';
+        input.focus();
+    }
+
+    // 兼容回车键直接添加
+    document.getElementById('newTask').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') addTask();
+    });
+</script>
+
+</body>
+</html>

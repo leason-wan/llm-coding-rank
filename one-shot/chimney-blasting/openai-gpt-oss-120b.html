@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Three.js 3D 建築拆除 Demo</title>
+<style>
+    body {margin:0; overflow:hidden; font-family:Arial,Helvetica, sans-serif; background:#111;}
+    #ui {
+        position: absolute; top: 10px; left: 10px; z-index: 100;
+        background: rgba(0,0,0,0.5); padding:10px; border-radius:4px;
+        color:#fff; user-select:none;
+    }
+    #ui button {margin:0 5px 5px 0; padding:5px 10px; font-size:14px;}
+</style>
+</head>
+<body>
+<div id="ui">
+    <button id="explodeBtn">爆炸</button>
+    <button id="resetBtn">重置</button>
+    <button id="viewBtn">切換視角</button>
+</div>
+
+<script type="module">
+/*===================================================================*/
+/* 1️⃣  基礎 Three.js + cannon-es 設定                                   */
+/*===================================================================*/
+import * as THREE   from 'https://cdn.jsdelivr.net/npm/three@0.162/build/three.module.js';
+import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.162/examples/jsm/controls/OrbitControls.js';
+import * as CANNON  from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/+esm';
+
+let scene, camera, renderer, controls, world;
+let clock = new THREE.Clock();
+let blockSize = 1;                     // 單個方塊的邊長
+let blocks = [];                      // 保存 {mesh, body}
+let sleepMaterial;                    // 用於設定高摩擦、低彈性
+let groundBody;
+let explosionPoint = null;            // 爆炸中心物理 (CANNON) 位置
+
+init();
+animate();
+
+/*===================================================================*/
+/* 2️⃣  初始化 Three.js 與物理世界                                           */
+/*===================================================================*/
+function init() {
+    // ------- three.js ---------
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 200);
+    camera.position.set(30, 30, 30);
+    renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // 光照
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(30,50,30);
+    scene.add(dirLight);
+    // 讓光照可在爆炸時調整亮度
+    scene.userData.envLight = ambient;
+    scene.userData.dirLight = dirLight;
+
+    // 控制器
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enablePan = false;   // 只想旋轉、縮放
+
+    // ------- cannon-es ----------
+    world = new CANNON.World();
+    world.broadphase = new CANNON.SAPBroadphase(world);
+    world.gravity.set(0, -9.82, 0);
+    world.solver.iterations = 12;
+    world.defaultContactMaterial.friction = 0.9; // 高摩擦
+    world.defaultContactMaterial.restitution = 0.04; // 低彈性
+
+    // 地面
+    const groundMat = new CANNON.Material('groundMat');
+    const groundGeo = new THREE.PlaneGeometry(80,80);
+    const groundTex = new THREE.MeshStandardMaterial({color:0x222222, side:THREE.DoubleSide});
+    const groundMesh = new THREE.Mesh(groundGeo, groundTex);
+    groundMesh.rotateX(-Math.PI/2);
+    scene.add(groundMesh);
+
+    const groundShape = new CANNON.Plane();
+    groundBody = new CANNON.Body({mass:0, material:groundMat});
+    groundBody.addShape(groundShape);
+    groundBody.quaternion.setFromEuler(-Math.PI/2,0,0);
+    world.addBody(groundBody);
+}
+
+/*===================================================================*/
+/* 3️⃣  生成圓形摩天大樓                                                   */
+/*===================================================================*/
+function createBuilding() {
+    // 先清空舊的
+    for (let o of blocks) {
+        scene.remove(o.mesh);
+        world.removeBody(o.body);
+    }
+    blocks = [];
+
+    const levels = 60;               // 高度 60 層
+    const circumferenceBlocks = 20; // 圍繞一圈的方塊數
+    const radius = (circumferenceBlocks * blockSize) / (2*Math.PI); // 近似半徑
+    const brickMat = new THREE.MeshStandardMaterial({color:0xE5C07B}); // 米色
+
+    // 每層使用 50% 交叉排列 (類似磚牆)
+    for (let y = 0; y < levels; y++) {
+        const yPos = y * blockSize + blockSize/2; // 把方塊中心放在正確高度
+        const angleStep = (2*Math.PI) / circumferenceBlocks;
+        const offset = (y % 2) * (angleStep/2); // 奇偶層偏移
+
+        for (let i = 0; i < circumferenceBlocks; i++) {
+            const theta = i * angleStep + offset;
+            const x = Math.cos(theta) * radius;
+            const z = Math.sin(theta) * radius;
+
+            // 方塊模型
+            const geo = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+            const mesh = new THREE.Mesh(geo, brickMat);
+            mesh.position.set(x, yPos, z);
+            scene.add(mesh);
+
+            // 剛體 – 設為動態 (mass>0) 讓衝擊波能作用, 但在建立後立即 sleep
+            const shape = new CANNON.Box(new CANNON.Vec3(blockSize/2, blockSize/2, blockSize/2));
+            const body = new CANNON.Body({
+                mass:1,                       // 有質量，才能受衝擊
+                position: new CANNON.Vec3(x, yPos, z),
+                shape: shape,
+                linearDamping: 0.1,
+                angularDamping: 0.1,
+                material: new CANNON.Material('brickMat')
+            });
+            // 高摩擦、低彈性 (黏合料)
+            const contactMat = new CANNON.ContactMaterial(
+                body.material, groundBody.material,
+                { friction:0.9, restitution:0.04 }
+            );
+            world.addContactMaterial(contactMat);
+            world.addBody(body);
+            body.sleep();                 // 直接進入休眠，避免建築因重力「下沉」
+            blocks.push({mesh, body});
+        }
+    }
+
+    // 爆炸裝置 – 放在第1層 (y=0) 右側最近的方塊
+    explosionPoint = new CANNON.Vec3(radius, blockSize/2, 0);
+}
+
+/*===================================================================*/
+/* 4️⃣  爆炸 & 物理驅動                                                  */
+/*===================================================================*/
+function explode() {
+    // 暫時提高環境光亮度，營造閃光效果
+    const env = scene.userData;
+    env.envLight.intensity = 2.5;
+    env.dirLight.intensity = 2.5;
+
+    // 觸發煙霧粒子
+    spawnExplosionParticle(explosionPoint);
+
+    // 讓所有磚塊醒過來
+    for (let o of blocks) {
+        o.body.wakeUp();
+    }
+
+    // 向半徑2內的磚塊施加衝擊力
+    const radius = 2;
+    const minForce = 2, maxForce = 5;
+    for (let o of blocks) {
+        const body = o.body;
+        const distance = body.position.distanceTo(explosionPoint);
+        if (distance < radius) {
+            const dir = body.position.clone().vsub(explosionPoint);
+            dir.normalize();
+            const strength = THREE.MathUtils.randFloat(minForce, maxForce);
+            const force = dir.scale(strength);
+            body.applyImpulse(force, new CANNON.Vec3(0,0,0));
+        }
+    }
+
+    // 0.5 秒後讓環境光恢復正常 (煙塵遮蔽)
+    setTimeout(() => {
+        const env = scene.userData;
+        env.envLight.intensity = 0.6;
+        env.dirLight.intensity = 0.8;
+    }, 500);
+}
+
+/*===================================================================*/
+/* 5️⃣  粒子系統 – 煙霧與灰塵                                            */
+/*===================================================================*/
+const particleGroup = new THREE.Group();
+scene.add(particleGroup);
+
+function spawnExplosionParticle(position) {
+    const particleCount = 150;
+    const geometry = new THREE.BufferGeometry();
+    const positions = [];
+    const sizes = [];
+    const lifetimes = [];
+
+    for (let i = 0; i < particleCount; i++) {
+        positions.push(position.x, position.y, position.z);
+        sizes.push(THREE.MathUtils.randFloat(0.4, 0.8));
+        lifetimes.push(THREE.MathUtils.randFloat(1.5, 2.5));
+    }
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+    geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes,1));
+    geometry.setAttribute('life', new THREE.Float32BufferAttribute(lifetimes,1));
+
+    const texture = new THREE.TextureLoader().load(
+        'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/sprites/soft.png');
+    const material = new THREE.PointsMaterial({
+        map: texture,
+        transparent:true,
+        alphaTest:0.1,
+        depthWrite:false,
+        sizeAttenuation:true,
+        vertexColors:false,
+        blending: THREE.AdditiveBlending
+    });
+
+    const points = new THREE.Points(geometry, material);
+    particleGroup.add(points);
+
+    // 給每個粒子動態 (簡易)
+    const start = performance.now();
+    const update = () => {
+        const elapsed = (performance.now() - start) / 1000;
+        const positions = geometry.attributes.position.array;
+        const lives = geometry.attributes.life.array;
+        for (let i = 0; i < particleCount; i++) {
+            if (lives[i] <= 0) continue;
+            const idx = i*3;
+            // 飛散方向隨機
+            const vx = (Math.random()*2-1)*0.5;
+            const vy = (Math.random()*1.5+0.5);
+            const vz = (Math.random()*2-1)*0.5;
+            positions[idx]   += vx * 0.02;
+            positions[idx+1] += vy * 0.02;
+            positions[idx+2] += vz * 0.02;
+            lives[i] -= 0.02;
+            // 逐漸淡出
+            const size = geometry.attributes.size.array[i];
+            geometry.attributes.size.array[i] = Math.max(0, size - 0.01);
+        }
+        geometry.attributes.position.needsUpdate = true;
+        geometry.attributes.size.needsUpdate = true;
+
+        if (elapsed < 3) requestAnimationFrame(update);
+        else particleGroup.remove(points);
+    };
+    update();
+}
+
+/*===================================================================*/
+/* 6️⃣  UI 按鈕、相機視角切換、重置                                      */
+/*===================================================================*/
+document.getElementById('explodeBtn').addEventListener('click', explode);
+document.getElementById('resetBtn').addEventListener('click', () => {
+    // 清除舊粒子
+    particleGroup.clear();
+    createBuilding();
+});
+let viewState = 0;
+document.getElementById('viewBtn').addEventListener('click', () => {
+    // three 個固定相機視角作示範
+    const targets = [
+        {pos:[30,30,30], up:[0,1,0]},   // 主視角
+        {pos:[0,55,0], up:[0,0,1]},    // 頂視
+        {pos:[-30,30, -30], up:[0,1,0]}// 後左斜視
+    ];
+    viewState = (viewState+1)%targets.length;
+    const t = targets[viewState];
+    controls.target.set(0,0,0);
+    camera.position.set(...t.pos);
+    camera.up.set(...t.up);
+    controls.update();
+});
+
+/*===================================================================*/
+/* 7️⃣  主循環                                                          */
+/*===================================================================*/
+function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(1/60, clock.getDelta());
+
+    // 讓物理世界前進若干步，保證剛體睡眠穩定
+    world.step(1/60, dt, 3);
+
+    // 把剛體位置同步回 three.js mesh
+    for (let o of blocks) {
+        o.mesh.position.copy(o.body.position);
+        o.mesh.quaternion.copy(o.body.quaternion);
+    }
+
+    renderer.render(scene, camera);
+}
+
+/*===================================================================*/
+/* 8️⃣  初始建築 -------------------------------------------------------*/
+/*===================================================================*/
+createBuilding();
+
+/*===================================================================*/
+/* 9️⃣  讓視窗大小變化時適應 ----------------------------------------*/
+/*===================================================================*/
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
