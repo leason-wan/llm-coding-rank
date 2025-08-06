@@ -96,11 +96,12 @@ def process_folder_model_combination(folder, model, prompt):
 def main():
     # Models to test
     models = [
-        "anthropic/claude-sonnet-4",
-        "z-ai/glm-4.5-air:free",
-        "moonshotai/kimi-k2:free",
-        "qwen/qwen3-coder:free",
-        "openrouter/horizon-alpha"
+        # "anthropic/claude-sonnet-4",
+        # "z-ai/glm-4.5-air:free",
+        # "moonshotai/kimi-k2:free",
+        # "qwen/qwen3-coder:free",
+        # "openrouter/horizon-alpha"
+        # "openrouter/horizon-beta"
     ]
 
     # Find all one-shot folders
