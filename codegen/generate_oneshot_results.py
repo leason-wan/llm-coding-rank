@@ -102,7 +102,7 @@ def main():
         # "qwen/qwen3-coder:free",
         # "openrouter/horizon-alpha"
         # "openrouter/horizon-beta"
-        "openai/gpt-oss-120b"
+        "deepseek/deepseek-chat-v3.1"
     ]
 
     # Find all one-shot folders

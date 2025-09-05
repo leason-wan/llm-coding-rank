@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoList 任务看板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .add-task-form {
+            display: flex;
+            margin-bottom: 30px;
+            gap: 10px;
+        }
+
+        .add-task-form input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .add-task-form button {
+            padding: 12px 25px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .add-task-form button:hover {
+            background-color: #2980b9;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .column {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            min-height: 500px;
+        }
+
+        .column h2 {
+            text-align: center;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #eee;
+            color: #2c3e50;
+        }
+
+        .todo-column h2 {
+            color: #e74c3c;
+        }
+
+        .doing-column h2 {
+            color: #f39c12;
+        }
+
+        .done-column h2 {
+            color: #2ecc71;
+        }
+
+        .task-list {
+            min-height: 400px;
+        }
+
+        .task {
+            background-color: white;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .task-content {
+            flex-grow: 1;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .task-actions button {
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .edit-btn {
+            color: #3498db;
+        }
+
+        .delete-btn {
+            color: #e74c3c;
+        }
+
+        .task.dragging {
+            opacity: 0.5;
+            background-color: #f8f9fa;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .board {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>我的任务看板</h1>
+            <p>轻松管理您的任务，提高工作效率</p>
+        </header>
+
+        <form class="add-task-form" id="addTaskForm">
+            <input type="text" id="taskInput" placeholder="添加新任务..." required>
+            <button type="submit">添加任务</button>
+        </form>
+
+        <div class="board">
+            <div class="column todo-column">
+                <h2>待处理</h2>
+                <div class="task-list" id="todoList" data-status="todo">
+                    <div class="empty-state">暂无任务</div>
+                </div>
+            </div>
+
+            <div class="column doing-column">
+                <h2>进行中</h2>
+                <div class="task-list" id="doingList" data-status="doing">
+                    <div class="empty-state">暂无任务</div>
+                </div>
+            </div>
+
+            <div class="column done-column">
+                <h2>已完成</h2>
+                <div class="task-list" id="doneList" data-status="done">
+                    <div class="empty-state">暂无任务</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 从本地存储加载任务
+            loadTasks();
+            
+            // 添加任务表单提交事件
+            document.getElementById('addTaskForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const taskInput = document.getElementById('taskInput');
+                const taskText = taskInput.value.trim();
+                
+                if (taskText) {
+                    addTask(taskText);
+                    taskInput.value = '';
+                }
+            });
+
+            // 设置拖放事件
+            setupDragAndDrop();
+        });
+
+        // 任务ID计数器
+        let taskId = 1;
+
+        // 添加新任务
+        function addTask(text, status = 'todo', id = null) {
+            const task = {
+                id: id || taskId++,
+                text: text,
+                status: status,
+                createdAt: new Date()
+            };
+            
+            // 保存到本地存储
+            saveTask(task);
+            
+            // 渲染任务
+            renderTask(task);
+            
+            return task;
+        }
+
+        // 保存任务到本地存储
+        function saveTask(task) {
+            const tasks = getTasks();
+            
+            // 如果任务已存在，则更新它
+            const index = tasks.findIndex(t => t.id === task.id);
+            if (index !== -1) {
+                tasks[index] = task;
+            } else {
+                tasks.push(task);
+            }
+            
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        // 从本地存储获取所有任务
+        function getTasks() {
+            const tasksJSON = localStorage.getItem('tasks');
+            return tasksJSON ? JSON.parse(tasksJSON) : [];
+        }
+
+        // 从本地存储加载所有任务
+        function loadTasks() {
+            const tasks = getTasks();
+            
+            // 更新任务ID计数器
+            if (tasks.length > 0) {
+                taskId = Math.max(...tasks.map(task => task.id)) + 1;
+            }
+            
+            // 渲染所有任务
+            tasks.forEach(task => renderTask(task));
+        }
+
+        // 渲染任务到对应列表
+        function renderTask(task) {
+            // 移除空状态提示
+            const list = document.getElementById(`${task.status}List`);
+            const emptyState = list.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            // 检查任务是否已存在
+            const existingTask = document.getElementById(`task-${task.id}`);
+            if (existingTask) {
+                existingTask.remove();
+            }
+            
+            // 创建任务元素
+            const taskElement = document.createElement('div');
+            taskElement.classList.add('task');
+            taskElement.id = `task-${task.id}`;
+            taskElement.draggable = true;
+            taskElement.dataset.id = task.id;
+            
+            taskElement.innerHTML = `
+                <div class="task-content">${task.text}</div>
+                <div class="task-actions">
+                    <button class="edit-btn" onclick="editTask(${task.id})">编辑</button>
+                    <button class="delete-btn" onclick="deleteTask(${task.id})">删除</button>
+                </div>
+            `;
+            
+            // 添加拖拽事件
+            taskElement.addEventListener('dragstart', function(e) {
+                e.dataTransfer.setData('text/plain', task.id);
+                taskElement.classList.add('dragging');
+            });
+            
+            taskElement.addEventListener('dragend', function() {
+                taskElement.classList.remove('dragging');
+            });
+            
+            // 添加到对应列表
+            list.appendChild(taskElement);
+        }
+
+        // 设置拖放功能
+        function setupDragAndDrop() {
+            const lists = document.querySelectorAll('.task-list');
+            
+            lists.forEach(list => {
+                list.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    const draggingElement = document.querySelector('.dragging');
+                    if (draggingElement) {
+                        const afterElement = getDragAfterElement(list, e.clientY);
+                        if (afterElement) {
+                            list.insertBefore(draggingElement, afterElement);
+                        } else {
+                            list.appendChild(draggingElement);
+                        }
+                    }
+                });
+                
+                list.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    const taskId = e.dataTransfer.getData('text/plain');
+                    const taskElement = document.getElementById(`task-${taskId}`);
+                    
+                    if (taskElement) {
+                        // 更新任务状态
+                        const newStatus = list.dataset.status;
+                        const tasks = getTasks();
+                        const task = tasks.find(t => t.id == taskId);
+                        
+                        if (task) {
+                            task.status = newStatus;
+                            saveTask(task);
+                        }
+                    }
+                });
+            });
+        }
+
+        // 获取拖拽后的元素位置
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.task:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // 删除任务
+        function deleteTask(id) {
+            if (confirm('确定要删除这个任务吗？')) {
+                // 从DOM中移除
+                const taskElement = document.getElementById(`task-${id}`);
+                if (taskElement) {
+                    taskElement.remove();
+                }
+                
+                // 从本地存储中移除
+                const tasks = getTasks();
+                const updatedTasks = tasks.filter(task => task.id !== id);
+                localStorage.setItem('tasks', JSON.stringify(updatedTasks));
+                
+                // 检查列表是否为空，如果为空显示空状态
+                const status = tasks.find(task => task.id === id)?.status;
+                if (status) {
+                    const list = document.getElementById(`${status}List`);
+                    if (list.children.length === 0) {
+                        const emptyState = document.createElement('div');
+                        emptyState.classList.add('empty-state');
+                        emptyState.textContent = '暂无任务';
+                        list.appendChild(emptyState);
+                    }
+                }
+            }
+        }
+
+        // 编辑任务
+        function editTask(id) {
+            const tasks = getTasks();
+            const task = tasks.find(t => t.id === id);
+            
+            if (task) {
+                const newText = prompt('编辑任务:', task.text);
+                if (newText !== null && newText.trim() !== '') {
+                    task.text = newText.trim();
+                    saveTask(task);
+                    renderTask(task);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
