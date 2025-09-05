@@ -1,0 +1,272 @@
+下面是一份可直接使用的单文件 TodoList 看板（含 HTML/CSS/JS，支持添加任务、拖拽在列间移动、编辑与删除、自动本地存储）。将其保存为 index.html 并用浏览器打开即可。
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TodoList 看板</title>
+  <style>
+    :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --text:#c9d1d9; --muted:#8b949e; --accent:#2ea043; --accent2:#58a6ff; --danger:#f85149; --card:#21262d; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background:var(--bg); color:var(--text); }
+    header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--panel);}
+    h1 { font-size:18px; margin:0; }
+    form.add { display:flex; gap:8px; flex:1 1 360px; }
+    .add input[type="text"] { flex:1; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--text); }
+    .add button { padding:10px 14px; border:1px solid var(--border); background:var(--accent2); color:#fff; border-radius:8px; cursor:pointer; }
+    .add button:disabled { opacity:.6; cursor:not-allowed; }
+    main { padding:16px; }
+    .board { display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; }
+    .col { background:var(--panel); border:1px solid var(--border); border-radius:10px; display:flex; flex-direction:column; min-height:50vh; }
+    .col header { display:flex; align-items:center; justify-content:space-between; background:transparent; border:none; padding:12px 12px 0 12px; }
+    .col h2 { font-size:16px; margin:0; }
+    .col .count { color:var(--muted); font-size:12px; }
+    .dropzone { padding:12px; flex:1; display:flex; flex-direction:column; gap:8px; }
+    .dropzone.dragover { outline:2px dashed var(--accent2); outline-offset:-6px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:10px; display:flex; gap:8px; align-items:flex-start; cursor:grab; }
+    .card[draggable="true"]:active { cursor:grabbing; }
+    .card .title { flex:1; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .card .meta { font-size:11px; color:var(--muted); margin-top:4px; }
+    .buttons { display:flex; gap:6px; }
+    button.icon { background:transparent; border:1px solid var(--border); color:var(--text); border-radius:8px; padding:6px 8px; cursor:pointer; }
+    button.icon.danger { border-color: rgba(248,81,73,.4); color: var(--danger); }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    @media (max-width: 900px) { .board{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TodoList 看板</h1>
+    <form class="add" id="addForm" autocomplete="off">
+      <label class="sr-only" for="taskInput">新任务</label>
+      <input id="taskInput" type="text" placeholder="输入任务后按回车或点击添加…" required maxlength="140">
+      <button type="submit">添加</button>
+    </form>
+  </header>
+  <main>
+    <section class="board" id="board" aria-label="看板">
+      <div class="col" data-col="todo">
+        <header><h2>待办</h2><span class="count" id="count-todo">0</span></header>
+        <div class="dropzone" data-col="todo"></div>
+      </div>
+      <div class="col" data-col="doing">
+        <header><h2>进行中</h2><span class="count" id="count-doing">0</span></header>
+        <div class="dropzone" data-col="doing"></div>
+      </div>
+      <div class="col" data-col="done">
+        <header><h2>已完成</h2><span class="count" id="count-done">0</span></header>
+        <div class="dropzone" data-col="done"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    ;(() => {
+      const storageKey = 'kanban-tasks-v1';
+      const boardEl = document.getElementById('board');
+      const form = document.getElementById('addForm');
+      const input = document.getElementById('taskInput');
+
+      let tasks = load() || seed();
+
+      function seed() {
+        const sample = [
+          { id: uid(), text: '阅读需求并创建任务', column: 'todo', createdAt: Date.now() },
+          { id: uid(), text: '实现拖拽功能', column: 'doing', createdAt: Date.now() - 3600e3 },
+          { id: uid(), text: '设置本地存储', column: 'done', createdAt: Date.now() - 7200e3 },
+        ];
+        save(sample);
+        return sample;
+      }
+
+      function uid() {
+        return 't_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36);
+      }
+
+      function save(list = tasks) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(list));
+        } catch (e) {
+          console.warn('无法保存到本地存储:', e);
+        }
+      }
+
+      function load() {
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        } catch {}
+        return null;
+      }
+
+      function render() {
+        const zones = boardEl.querySelectorAll('.dropzone');
+        zones.forEach(z => z.innerHTML = '');
+        tasks.forEach(task => {
+          const card = createCard(task);
+          const zone = boardEl.querySelector('.dropzone[data-col="'+task.column+'"]');
+          if (zone) zone.appendChild(card);
+        });
+        updateCounts();
+      }
+
+      function updateCounts() {
+        const cols = ['todo','doing','done'];
+        cols.forEach(col => {
+          const count = tasks.filter(t => t.column === col).length;
+          const el = document.getElementById('count-'+col);
+          if (el) el.textContent = count;
+        });
+      }
+
+      function createCard(task) {
+        const el = document.createElement('article');
+        el.className = 'card';
+        el.draggable = true;
+        el.dataset.id = task.id;
+        el.setAttribute('aria-grabbed', 'false');
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = task.text;
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = timeAgo(task.createdAt);
+
+        const btns = document.createElement('div');
+        btns.className = 'buttons';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'icon';
+        editBtn.title = '编辑';
+        editBtn.textContent = '编辑';
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'icon danger';
+        delBtn.title = '删除';
+        delBtn.textContent = '删除';
+
+        btns.appendChild(editBtn);
+        btns.appendChild(delBtn);
+
+        const textWrap = document.createElement('div');
+        textWrap.style.flex = '1';
+        textWrap.appendChild(title);
+        textWrap.appendChild(meta);
+
+        el.appendChild(textWrap);
+        el.appendChild(btns);
+
+        el.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/plain', task.id);
+          e.dataTransfer.effectAllowed = 'move';
+          el.style.opacity = '.6';
+          el.setAttribute('aria-grabbed', 'true');
+        });
+        el.addEventListener('dragend', () => {
+          el.style.opacity = '';
+          el.setAttribute('aria-grabbed', 'false');
+        });
+
+        let editing = false;
+        editBtn.addEventListener('click', () => {
+          if (!editing) {
+            editing = true;
+            editBtn.textContent = '保存';
+            title.contentEditable = 'true';
+            title.focus();
+            placeCursorAtEnd(title);
+          } else {
+            editing = false;
+            editBtn.textContent = '编辑';
+            title.contentEditable = 'false';
+            const newText = title.textContent.trim();
+            if (!newText) {
+              title.textContent = task.text;
+              return;
+            }
+            task.text = newText;
+            save();
+          }
+        });
+
+        delBtn.addEventListener('click', () => {
+          if (confirm('删除该任务？')) {
+            tasks = tasks.filter(t => t.id !== task.id);
+            save();
+            render();
+          }
+        });
+
+        return el;
+      }
+
+      function placeCursorAtEnd(el) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+
+      function timeAgo(ts) {
+        const s = Math.floor((Date.now() - ts) / 1000);
+        if (s < 60) return '刚刚';
+        const m = Math.floor(s/60);
+        if (m < 60) return m + ' 分钟前';
+        const h = Math.floor(m/60);
+        if (h < 24) return h + ' 小时前';
+        const d = Math.floor(h/24);
+        return d + ' 天前';
+      }
+
+      const zones = boardEl.querySelectorAll('.dropzone');
+      zones.forEach(zone => {
+        zone.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          zone.classList.add('dragover');
+        });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', e => {
+          e.preventDefault();
+          zone.classList.remove('dragover');
+          const id = e.dataTransfer.getData('text/plain');
+          const task = tasks.find(t => t.id === id);
+          if (!task) return;
+          const toCol = zone.dataset.col;
+          if (task.column !== toCol) {
+            task.column = toCol;
+            save();
+            render();
+          }
+        });
+      });
+
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        tasks.push({ id: uid(), text, column: 'todo', createdAt: Date.now() });
+        input.value = '';
+        save();
+        render();
+      });
+
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
+          e.preventDefault();
+          form.requestSubmit();
+        }
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

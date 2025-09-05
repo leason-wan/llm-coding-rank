@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title desc">
+  <title id="title">Pelican riding a bicycle</title>
+  <desc id="desc">A stylized white pelican with an orange beak riding a teal bicycle with two large wheels, holding the handlebars with a wing while its feet press the pedals.</desc>
+
+  <defs>
+    <!-- Simple gradient for subtle depth -->
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dff3ff"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+    <radialGradient id="shadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(0,0,0,0.22)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+
+    <!-- Spoke to be reused -->
+    <line id="spoke" x1="0" y1="0" x2="0" y2="-78" stroke="#b8c1c9" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Feather tips for the front wing "fingers" -->
+    <path id="feather-tip" d="M0,0 C6,-3 12,-3 16,0 C12,5 6,6 0,0 Z" fill="#20242a"/>
+
+    <!-- Simple webbed foot shape -->
+    <path id="webbed-foot" d="M0,0 C18,-6 36,-6 52,0 L42,10 L26,8 L10,12 Z" fill="#ff8e2a" stroke="#d66a10" stroke-width="2" stroke-linejoin="round"/>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="100%" height="100%" fill="url(#sky)"/>
+  <path d="M0,505 C180,490 340,500 800,495 L800,600 L0,600 Z" fill="#e8f4e8"/>
+
+  <!-- Ground shadows -->
+  <ellipse cx="210" cy="540" rx="120" ry="24" fill="url(#shadow)"/>
+  <ellipse cx="520" cy="540" rx="120" ry="24" fill="url(#shadow)"/>
+
+  <!-- Bicycle -->
+  <g id="bicycle" transform="translate(0,-20)">
+    <!-- Rear wheel -->
+    <g id="rear-wheel" transform="translate(210,470)">
+      <circle r="92" fill="#111" />
+      <circle r="80" fill="#2f2f2f" stroke="#9aa4ad" stroke-width="3"/>
+      <circle r="8" fill="#cfd8df" stroke="#9aa4ad" stroke-width="2"/>
+      <g>
+        <use href="#spoke"/>
+        <use href="#spoke" transform="rotate(15)"/>
+        <use href="#spoke" transform="rotate(30)"/>
+        <use href="#spoke" transform="rotate(45)"/>
+        <use href="#spoke" transform="rotate(60)"/>
+        <use href="#spoke" transform="rotate(75)"/>
+        <use href="#spoke" transform="rotate(90)"/>
+        <use href="#spoke" transform="rotate(105)"/>
+        <use href="#spoke" transform="rotate(120)"/>
+        <use href="#spoke" transform="rotate(135)"/>
+        <use href="#spoke" transform="rotate(150)"/>
+        <use href="#spoke" transform="rotate(165)"/>
+      </g>
+    </g>
+
+    <!-- Front wheel -->
+    <g id="front-wheel" transform="translate(520,470)">
+      <circle r="92" fill="#111" />
+      <circle r="80" fill="#2f2f2f" stroke="#9aa4ad" stroke-width="3"/>
+      <circle r="8" fill="#cfd8df" stroke="#9aa4ad" stroke-width="2"/>
+      <g>
+        <use href="#spoke"/>
+        <use href="#spoke" transform="rotate(15)"/>
+        <use href="#spoke" transform="rotate(30)"/>
+        <use href="#spoke" transform="rotate(45)"/>
+        <use href="#spoke" transform="rotate(60)"/>
+        <use href="#spoke" transform="rotate(75)"/>
+        <use href="#spoke" transform="rotate(90)"/>
+        <use href="#spoke" transform="rotate(105)"/>
+        <use href="#spoke" transform="rotate(120)"/>
+        <use href="#spoke" transform="rotate(135)"/>
+        <use href="#spoke" transform="rotate(150)"/>
+        <use href="#spoke" transform="rotate(165)"/>
+      </g>
+    </g>
+
+    <!-- Frame geometry -->
+    <!-- Key points: rear hub (210,470), front hub (520,470), bottom bracket (340,470), seat (300,360), head tube (520,360) -->
+    <g id="frame" stroke="#1d8794" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <!-- Chainstay -->
+      <path d="M340,470 L230,470"/>
+      <!-- Seat tube -->
+      <path d="M340,470 L300,360"/>
+      <!-- Seat stay -->
+      <path d="M300,360 L230,470"/>
+      <!-- Top tube -->
+      <path d="M300,360 L520,360"/>
+      <!-- Down tube -->
+      <path d="M340,470 L520,360"/>
+      <!-- Fork -->
+      <path d="M520,360 L520,470"/>
+      <path d="M520,360 C530,420 530,445 520,470"/>
+      <!-- Seat -->
+      <path d="M270,350 C292,340 321,340 340,350" stroke="#262b30"/>
+    </g>
+
+    <!-- Handlebars and stem -->
+    <g id="handlebar" fill="none" stroke="#262b30" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M520,360 L520,335" stroke-width="8"/>
+      <path d="M520,335 C540,335 560,325 575,320" stroke-width="9"/>
+      <path d="M520,335 C500,335 480,325 465,320" stroke-width="9"/>
+      <!-- Grips -->
+      <path d="M456,320 L474,320" stroke-width="10"/>
+      <path d="M566,320 L584,320" stroke-width="10"/>
+    </g>
+
+    <!-- Drivetrain: cranks and pedals (bottom bracket at 340,470) -->
+    <g id="drivetrain" transform="translate(340,470)">
+      <!-- Chainring / BB -->
+      <circle r="12" fill="#2a2f36" stroke="#9aa4ad" stroke-width="3"/>
+      <!-- Crank arms (angle -25deg) -->
+      <g transform="rotate(-25)">
+        <rect x="6" y="-3" width="56" height="6" rx="3" fill="#2a2f36"/>
+        <g transform="translate(62,0) rotate(90)">
+          <rect x="-16" y="-6" width="32" height="12" rx="3" fill="#444"/>
+        </g>
+      </g>
+      <g transform="rotate(155)">
+        <rect x="6" y="-3" width="56" height="6" rx="3" fill="#2a2f36"/>
+        <g transform="translate(62,0) rotate(90)">
+          <rect x="-16" y="-6" width="32" height="12" rx="3" fill="#444"/>
+        </g>
+      </g>
+      <!-- Simple chain line -->
+      <path d="M12,0 C70,-20 180,-50 180,-50" stroke="#6a6f78" stroke-width="3" fill="none" opacity="0.25"/>
+    </g>
+  </g>
+
+  <!-- Pelican -->
+  <g id="pelican" transform="translate(0,-20)" stroke-linejoin="round">
+    <!-- Tail (behind seat stay) -->
+    <path d="M240,355 C222,352 208,345 202,335 C214,332 228,334 244,340 Z" fill="#eaeff7" stroke="#c3ccd6" stroke-width="2"/>
+
+    <!-- Body -->
+    <ellipse cx="320" cy="360" rx="95" ry="62" fill="#f9fbff" stroke="#cfd7e1" stroke-width="3"/>
+    <!-- Wing (rear) -->
+    <path d="M260,360 C245,385 248,405 270,420 C292,435 332,438 360,430 C345,420 338,407 340,390 C320,396 302,392 286,382 C276,375 268,368 260,360 Z"
+          fill="#e6ebf2" stroke="#c7d0da" stroke-width="2"/>
+    <!-- Wing tip accent -->
+    <path d="M332,430 C352,430 368,428 380,423 C382,421 384,419 384,416 C374,417 362,417 350,415 C342,413 336,411 330,408 C330,416 330,422 332,430 Z"
+          fill="#1f232a" opacity="0.9"/>
+
+    <!-- Neck -->
+    <path d="M350,340 C380,310 430,300 480,308 C490,310 498,315 504,320 C494,320 484,322 474,326 C448,335 428,352 404,368 C392,376 380,372 372,360 C364,348 356,343 350,340 Z"
+          fill="#f9fbff" stroke="#cfd7e1" stroke-width="3"/>
+
+    <!-- Head -->
+    <g id="head" transform="translate(0,0)">
+      <ellipse cx="500" cy="310" rx="28" ry="24" fill="#f9fbff" stroke="#cfd7e1" stroke-width="3"/>
+      <!-- Eye -->
+      <circle cx="507" cy="305" r="6.2" fill="#1c2126"/>
+      <circle cx="509.5" cy="302.5" r="2.2" fill="#fff" opacity="0.9"/>
+
+      <!-- Beak: upper and lower mandibles -->
+      <path d="M512,312 C550,306 600,302 648,304 C654,304 658,306 660,309 C658,312 654,314 648,314 C600,314 552,320 512,326 Z"
+            fill="#ff9f2e" stroke="#d67812" stroke-width="3"/>
+      <path d="M512,312 C548,318 597,328 642,334 C648,335 652,337 653,340 C646,344 632,344 618,342 C578,336 542,328 512,322 Z"
+            fill="#ffb25a" stroke="#d67812" stroke-width="3"/>
+      <!-- Beak pouch hint -->
+      <path d="M512,322 C535,330 566,338 600,342" stroke="#e28b2a" stroke-width="2" opacity="0.6" fill="none"/>
+    </g>
+
+    <!-- Front wing reaching handlebars -->
+    <g id="front-wing">
+      <path d="M340,365 C362,350 392,338 426,334 C448,332 468,333 486,336 C500,338 510,340 520,335 C520,340 516,342 512,346 C504,353 493,362 482,368 C456,382 426,392 396,394 C382,395 372,392 362,385 C350,376 344,371 340,365 Z"
+            fill="#e7edf5" stroke="#c7d0da" stroke-width="3"/>
+      <!-- Feathered "fingers" gripping left grip -->
+      <g transform="translate(466,320) rotate(-8)">
+        <use href="#feather-tip"/>
+      </g>
+      <g transform="translate(476,319) rotate(-2)">
+        <use href="#feather-tip"/>
+      </g>
+    </g>
+
+    <!-- Legs and feet -->
+    <!-- Right leg to front pedal at approx (402,447) after transforms -->
+    <g id="legs" stroke="#d66a10" stroke-width="4" fill="none" stroke-linecap="round">
+      <path d="M330,380 C357,398 375,415 392,428 C398,433 402,441 404,447" />
+      <path d="M312,382 C304,398 298,414 294,430 C292,438 292,446 292,456" />
+    </g>
+    <!-- Feet positioned on pedals (drivetrain pedals near (402,447) and (292,495)) -->
+    <g id="feet">
+      <g transform="translate(402,447) rotate(-5)">
+        <use href="#webbed-foot"/>
+      </g>
+      <g transform="translate(292,495) rotate(10)">
+        <use href="#webbed-foot"/>
+      </g>
+    </g>
+
+    <!-- Small shading under body -->
+    <ellipse cx="330" cy="418" rx="48" ry="12" fill="rgba(0,0,0,0.08)"/>
+  </g>
+</svg>
